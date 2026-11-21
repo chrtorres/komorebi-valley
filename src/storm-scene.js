@@ -1,26 +1,7 @@
+import { chochinGeometry, createKitPlacer, placeTorii } from "./shrine-kit.js";
 import { createSakuraGroves, sakuraPlantings } from "./sakura-groves.js";
 import { createStormCloudMap, createStormSurfaceMaps, roundedStormBox, stormGroundSurfaces } from "./storm-surfaces.js";
 
-function toriiCrown(T) {
-  const profile = new T.Shape();
-  for (let i = 0; i <= 20; i++) {
-    const x = i / 20 - 0.5;
-    const y = 0.25 * Math.pow(Math.abs(x) * 2, 3);
-    if (i === 0) profile.moveTo(x, y);
-    else profile.lineTo(x, y);
-  }
-  for (let i = 20; i >= 0; i--) {
-    const x = i / 20 - 0.5;
-    profile.lineTo(x, 0.22 + 0.45 * Math.pow(Math.abs(x) * 2, 3));
-  }
-  profile.closePath();
-  return new T.ExtrudeGeometry(profile, {
-    depth: 0.92, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.018, bevelSegments: 2,
-  }).translate(0, 0, -0.46);
-}
-
-// Campaign-only scenery. Call setActive(true) on entry and false on exit.
-// The base world remains owned by its engine; no objects are removed or disposed.
 export function createStormScene(T, scene, baseHeight) {
   const root = new T.Group();
   root.name = "Storm temple avenue";
@@ -150,11 +131,12 @@ export function createStormScene(T, scene, baseHeight) {
     bindings = [],
     housings = [],
     panes = [];
-  for (const [x, z, width, h] of [
+  const gates = [
     [pathX(-17), -17, 7, 5.6],
     [pathX(-39), -39, 8, 6],
     [10, -63, 13, 9],
-  ]) {
+  ];
+  for (const [x, z, width, h] of gates) {
     const y = ground(x, z);
     for (const side of [-1, 1]) {
       pillars.push({
@@ -186,30 +168,21 @@ export function createStormScene(T, scene, baseHeight) {
         s: [width / 2 + 2, 0.3, 1.15],
         r: [0, 0, side * 0.065],
       });
-    mesh(
-      joinery,
-      mat("#907454", 0.47, 0.48),
-      x,
-      y + h * 0.89,
-      z + 0.32,
-      0.7,
-      0.9,
-      0.12,
-    );
   }
   // Camera volumes follow the authored gate footprint, independently of ornamental geometry.
   recordCameraBounds(cylinder, pillars);
   recordCameraBounds(box, redBeams);
   recordCameraBounds(box, caps);
-  batch(new T.CylinderGeometry(0.88, 1, 1, 20), lacquer, pillars, true);
-  batch(joinery, lacquer, redBeams, true);
-  batch(curb, darkStone, caps.filter((_, i) => i % 4 < 2), true);
-  batch(toriiCrown(T), mat("#21283b", 0.43), crowns, true).name = "Swept torii crowns";
-  batch(joinery, mat("#3b3234", 0.56, 0.3), bindings);
-  batch(curb, cedar, housings);
-  batch(curb, new T.MeshStandardMaterial({
-    color: "#99694a", emissive: "#f09a52", emissiveIntensity: 0.52, roughness: 0.85,
-  }), panes);
+  // The authored kit draws the gates; the records above still define their camera volumes.
+  const kit = createKitPlacer(T, root);
+  for (const [x, z, width, h] of gates) placeTorii(kit, x, ground(x, z), z, width, h, { thick: width > 10 ? 1.35 : 1.1 });
+  // Paper chochin hang where the cube lanterns were.
+  const chochin = new T.InstancedMesh(chochinGeometry(T, .2, .44), new T.MeshStandardMaterial({
+    color: "#d9643c", emissive: "#ff9a4d", emissiveIntensity: 1.1, roughness: .8,
+  }), panes.length);
+  panes.forEach(({ p }, i) => chochin.setMatrixAt(i, new T.Matrix4().makeTranslation(p[0], p[1], p[2])));
+  chochin.name = "Gate chochin";
+  root.add(chochin);
 
   // Roof decks are intentionally flat playable surfaces; pitched eaves sit outside
   // their footprints. Each ramp meets its deck at exactly the same absolute Y.
@@ -541,5 +514,5 @@ export function createStormScene(T, scene, baseHeight) {
     });
     particles.attributes.position.needsUpdate = true;
   }
-  return { update, height, setActive, cameraObstacles };
+  return { update, height, setActive, cameraObstacles, kit };
 }

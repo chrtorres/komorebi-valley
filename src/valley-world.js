@@ -3,9 +3,20 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createKoiHabitat, pondHeight, pondRadius, POND_X, POND_Z } from "./koi/habitat.js";
 import { createLeafCards, createGrassGeometry } from "./valley-vegetation.js";
+import { createKitPlacer, placeTorii } from "./shrine-kit.js";
 // Deterministic authored landscape: collision height and rendered ground share one function.
 export function createWorld(T, scene) {
   const cameraObstacles = [];
+  // Authored architecture replaces the procedural stand-ins. Each stand-in is still
+  // built so its camera volume is recorded exactly as before, then retired from view.
+  const kit = createKitPlacer(T, scene);
+  let retiring = null;
+  const retire = (build) => {
+    retiring = [];
+    build();
+    for (const m of retiring) m.removeFromParent();
+    retiring = null;
+  };
   const cameraBox = (x, y, z, rx, height, rz) =>
     cameraObstacles.push({
       min: { x: x - rx, y, z: z - rz },
@@ -117,6 +128,7 @@ export function createWorld(T, scene) {
     m.castShadow = true;
     m.receiveShadow = true;
     parent.add(m);
+    retiring?.push(m);
     return m;
   }
   function beam(a, b, r, color, map = null) {
@@ -188,20 +200,38 @@ export function createWorld(T, scene) {
   scene.add(terrain);
   // Rounded top edges catch low sunlight while the path retains its original footprint.
   const paver = new RoundedBoxGeometry(1, 1, 1, 1, .13);
+  // Hand-cut flagstones: irregular rounded outlines, thin bevelled slabs laid flush.
+  const flagstones = [];
+  for (let k = 0; k < 7; k++) {
+    const shape = new T.Shape();
+    const sides = 7 + (k % 3);
+    for (let v = 0; v <= sides; v++) {
+      const a = (v % sides) / sides * Math.PI * 2;
+      const rr = .5 + .08 * Math.sin(a * 3 + k * 1.7) + .05 * Math.cos(a * 5 + k);
+      const px = Math.cos(a) * rr * .98, pz = Math.sin(a) * rr * .7;
+      if (v === 0) shape.moveTo(px, pz); else shape.lineTo(px, pz);
+    }
+    const g = new T.ExtrudeGeometry(shape, {
+      depth: .06, bevelEnabled: true, bevelThickness: .03, bevelSize: .035, bevelSegments: 3, curveSegments: 4,
+    });
+    g.rotateX(-Math.PI / 2);
+    g.computeVertexNormals();
+    flagstones.push(g);
+  }
   for (let i = 0; i < 145; i++) {
     const z = 30 - i * 0.72,
       x = pathX(z);
     for (let j = 0; j < 3; j++) {
       const px = x + (j - 1) * 1.03 + (rand() - 0.5) * 0.12;
       const m = mesh(
-        paver,
+        flagstones[(i * 3 + j * 5) % flagstones.length],
         ["#909187", "#a2a296", "#99998d", "#878980"][(i * 7 + j * 3) % 4],
         px,
-        height(px, z) + 0.07,
+        height(px, z) + 0.012,
         z,
-        0.98,
-        0.15,
-        0.69,
+        .96,
+        1,
+        .96,
         stoneTexture,
       );
       m.material.userData.valleySurface = "path";
@@ -238,8 +268,11 @@ export function createWorld(T, scene) {
     cameraMesh(mesh(cube, colors.red, x, y + 5.45, z, 7.2, 0.3, 0.48, woodTexture));
     cameraMesh(mesh(cube, "#b2955c", x, y + 5, z, 0.55, 0.75, 0.1));
   }
-  torii(8);
-  torii(-37);
+  for (const z of [8, -37]) {
+    retire(() => torii(z));
+    const x = pathX(z);
+    placeTorii(kit, x, height(x, z), z, 5.3, 5.6);
+  }
   // Leaf cards and grass are instanced so vegetation density does not imply thousands of draws.
   const leaves = createLeafCards(T, 22400);
   scene.add(leaves);
@@ -445,8 +478,12 @@ export function createWorld(T, scene) {
       );
     mesh(cube, "#453b2c", x, y + 1.9, z + 3.13, 1.4, 2.8, 0.2);
   }
-  temple(-15, -37);
-  temple(15, -65);
+  for (const [x, z] of [[-15, -37], [15, -65]]) {
+    retire(() => temple(x, z));
+    kit.place("ShrineHall", [x, height(x, z), z]);
+    // The authored irimoya roof rises to a 7.4 m ridge with eaves at ±5.8 x ±4.8 m.
+    cameraBox(x, height(x, z) + 3.6, z, 5.9, 3.85, 4.9);
+  }
   const pond = createKoiHabitat(T, scene, pondY, height);
   const sakura = createSakuraGroves(T, scene, height, "pass");
   // Lateral sprays break up the bamboo poles while leaving the grove open at eye level.
@@ -519,19 +556,17 @@ export function createWorld(T, scene) {
     mesh(cube, "#463c2f", watchMarker.x - .08 + line * .08, markerY + .62,
       watchMarker.z + .133, .015, .21 + .04 * (line % 2), .017);
   const lanterns = [];
+  // Matches the kit's firebox contract: hexagonal paper, r .2, 1.565-1.965 m.
+  const lanternPaper = new T.CylinderGeometry(.2, .2, .4, 6);
   for (let i = 0; i < 7; i++) {
     const z = 8 - i * 11,
       x = pathX(z) + (i % 2 ? 3.1 : -3.1),
       y = height(x, z);
-    mesh(cube, "#747866", x, y + 0.13, z, 0.95, 0.26, 0.95, stoneTexture);
-    mesh(cylinder, "#747866", x, y + 0.75, z, 0.18, 1.2, 0.18, stoneTexture);
-    mesh(cube, "#727765", x, y + 1.45, z, 0.75, 0.16, 0.75, stoneTexture);
-    const lamp = mesh(cube, "#9d9675", x, y + 1.85, z, 0.47, 0.55, 0.47);
-    for (const dx of [-0.3, 0.3])
-      for (const dz of [-0.3, 0.3])
-        mesh(cube, "#6a705c", x + dx, y + 1.85, z + dz, 0.08, 0.65, 0.08);
-    mesh(new T.ConeGeometry(0.68, 0.5, 4), "#69715d", x, y + 2.4, z);
-    mesh(rock, "#78816a", x, y + 2.74, z, 0.15, 0.19, 0.15);
+    // Kasuga stone lantern from the kit; the paper prism inside its firebox is the
+    // interactive lamp whose material the journey swaps when the signal is restored.
+    kit.place("Toro", [x, y, z], { rotationY: (i % 2 ? -1 : 1) * .25 + i * .7 });
+    const lamp = mesh(lanternPaper, "#bdb197", x, y + 1.765, z);
+    lamp.castShadow = false;
     const light = new T.PointLight("#ffc983", 0, 5, 2);
     light.position.set(x, y + 1.8, z);
     scene.add(light);
@@ -631,6 +666,7 @@ export function createWorld(T, scene) {
     vaultBarriers,
     watchMarker,
     lanterns,
+    kit,
     spawn: [5, height(5, 16), 16],
     update(dt, time, position, stormActive) {
       sakura.update(position, time, !stormActive);

@@ -46,6 +46,8 @@ const camera = new T.PerspectiveCamera(54, innerWidth / innerHeight, 0.15, 700),
   world = createWorld(T, scene),
   { height, lanterns, vaultBarriers, watchMarker } = world;
 enhanceAtmosphere(T, scene, world);
+// Authored shrine kit (torii, lanterns, halls) streams in behind the title card.
+world.kit.attach().catch((error) => console.warn("Shrine kit unavailable:", error.message));
 const presentation = createValleyRender(renderer, scene, camera);
 const player = new T.Group();
 scene.add(player);

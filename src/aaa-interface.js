@@ -45,7 +45,9 @@ export function createInterface({ root }) {
     // players see the veil close before the swap. ?veil=1 forces the player path.
     const immediate = navigator.webdriver && params.get("veil") !== "1";
     const swap = immediate ? 0 : reduce.matches ? 60 : 650;
-    (immediate ? (fn) => fn() : (fn) => setTimeout(fn, swap))(() => {
+    // A microtask (not a direct call) because the action re-clicks the button: browsers
+    // ignore a nested click() on an element whose own click is still dispatching.
+    (immediate ? queueMicrotask : (fn) => setTimeout(fn, swap))(() => {
       try { action(); } finally {
         // Let one frame render the new scene before revealing it.
         requestAnimationFrame(() => requestAnimationFrame(() => {

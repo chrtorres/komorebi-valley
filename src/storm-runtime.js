@@ -24,6 +24,7 @@ export function createStormRuntime(
   soundEnabled,
 ) {
   const scenery = createStormScene(T, scene, baseHeight);
+  scenery.kit.attach().catch((error) => console.warn("Storm shrine kit unavailable:", error.message));
   const height = (x, z) =>
     scenery.height(x, z, baseHeight(x, z), player.position.y);
   let initial;

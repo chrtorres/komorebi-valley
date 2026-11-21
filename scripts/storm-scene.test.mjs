@@ -131,12 +131,11 @@ test("roof side entry stays on ground while above-deck and ramp queries work", (
 
 test("guardian gate centers on x10 at z-63", () => {
   const f = fixture();
-  const badges = f.scene
-    .getObjectByName("Storm temple avenue")
-    .children.filter(
-      (o) => o.isMesh && !o.isInstancedMesh && o.position.z === -62.68,
-    );
-  assert(badges.some((o) => o.position.x === 10));
+  // The plaque hangs on the gate's front face, centred between its posts.
+  const plaques = f.api.kit.placements("ToriiPlaque").map((m) => new T.Vector3().setFromMatrixPosition(m));
+  assert(plaques.some((p) => p.x === 10 && p.z > -63 && p.z < -62.5));
+  const posts = f.api.kit.placements("ToriiPillar").map((m) => new T.Vector3().setFromMatrixPosition(m));
+  assert(posts.some((p) => p.x === 3.5) && posts.some((p) => p.x === 16.5), "13 m span centred on x10");
 });
 
 test("nearby lightning displaces petals once and impulse decays to baseline", () => {

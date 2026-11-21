@@ -10,6 +10,8 @@
  * Core enemy timer counts DOWN; player timer is total elapsed attack time.
  * Unknown phases are safe idle poses. This helper never changes gameplay state.
  */
+import { loadShrineKit } from "./shrine-kit.js";
+
 export function createCombatView(T, scene, player, { playerWeapon = true } = {}) {
   const geometries = new Set(),
     materials = new Set(),
@@ -127,19 +129,52 @@ export function createCombatView(T, scene, player, { playerWeapon = true } = {})
     sprite.position.y = 2.25;
     return { sprite, canvas, texture, ratio: -1 };
   }
+  // The authored war-worn warden replaces the primitive stand-in once the kit loads.
+  // Its cloth gains a faint spectral emission so wardens stay readable in mist and storm.
+  let wardenKit = null;
+  const browser = typeof window !== "undefined" && typeof window.document !== "undefined";
+  if (browser) loadShrineKit(T).then((parts) => {
+    const part = parts.get("Warden");
+    if (!part || disposed) return;
+    wardenKit = part.primitives.map(({ geometry, material, local }) => {
+      const m = ownMaterial(material.clone());
+      if (/WardenCloth|WardenScarf/.test(m.name)) {
+        m.emissive = new T.Color(/Scarf/.test(m.name) ? 0x3a0a0e : 0x0e2a2a);
+        m.emissiveIntensity = 1;
+      }
+      return { geometry, material: m, local };
+    });
+    for (const v of wardens.values()) dressWarden(v);
+  }).catch(() => {
+    // Keep the primitive stand-in if the asset cannot load.
+  });
+  function dressWarden(v) {
+    if (!wardenKit || v.dressed) return;
+    v.dressed = true;
+    v.body.visible = false;
+    for (const { geometry, material, local } of wardenKit) {
+      const o = new T.Mesh(geometry, material);
+      o.applyMatrix4(local);
+      o.castShadow = true;
+      v.node.add(o);
+    }
+  }
   function makeWarden(id) {
     const node = new T.Group();
     node.name = `SpiritWarden_${id}`;
     root.add(node);
-    mesh(node, geo.cone, mat.spirit, [0, 0.7, 0], [0.34, 1.2, 0.26]);
-    mesh(node, geo.box, mat.armor, [0, 1.23, 0], [0.52, 0.42, 0.29]);
-    mesh(node, geo.sphere, mat.trim, [0, 1.66, 0], [0.17, 0.19, 0.16]);
-    mesh(node, geo.box, mat.armor, [0, 1.69, 0.12], [0.34, 0.1, 0.12]);
-    mesh(node, geo.box, mat.glow, [0, 1.68, 0.189], [0.2, 0.025, 0.012]);
+    const body = new T.Group();
+    body.name = "WardenStandIn";
+    node.add(body);
+    mesh(body, geo.cone, mat.spirit, [0, 0.7, 0], [0.34, 1.2, 0.26]);
+    mesh(body, geo.box, mat.armor, [0, 1.23, 0], [0.52, 0.42, 0.29]);
+    mesh(body, geo.sphere, mat.trim, [0, 1.66, 0], [0.17, 0.19, 0.16]);
+    mesh(body, geo.box, mat.armor, [0, 1.69, 0.12], [0.34, 0.1, 0.12]);
+    mesh(body, geo.box, mat.glow, [0, 1.68, 0.189], [0.2, 0.025, 0.012]);
     for (const side of [-1, 1]) {
-      mesh(node, geo.box, mat.armor, [side * 0.32, 1.3, 0], [0.22, 0.15, 0.32]);
+      mesh(body, geo.box, mat.armor, [side * 0.32, 1.3, 0], [0.22, 0.15, 0.32]);
       const horn = mesh(
-        node,
+        body,
         geo.cone,
         mat.trim,
         [side * 0.18, 1.88, 0],
@@ -169,7 +204,9 @@ export function createCombatView(T, scene, player, { playerWeapon = true } = {})
     ring.visible = false;
     const health = healthSprite();
     node.add(health.sprite);
-    return { node, weapon, ring, health };
+    const v = { node, weapon, ring, health, body, dressed: false };
+    dressWarden(v);
+    return v;
   }
   function removeWarden(v) {
     v.node.removeFromParent();
