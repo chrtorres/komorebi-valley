@@ -41,3 +41,25 @@ The meter-scale pilgrim model is retained as `src/assets/pilgrim.glb`, with meas
 - Fixed: the authored sakura GLBs failed to decode under three r187 (Draco decoder URLs). They now load.
 
 Automated browsers (`navigator.webdriver`) skip the title card and swap scenes synchronously under the veil. Add `?title=1&veil=1` to exercise the player path.
+
+## Mission: 狼煙 The Ridge Signal
+
+Read the watch marker (E / X) to begin. Five objectives follow:
+1. Reach the ruined cloister west of the lantern path behind the shrine.
+2. Free-run the three stone posts.
+3. Reach the shrine roof: wall-run the cloister wall, then jump to kick off north.
+4. Climb the roof to the ridge and light the beacon (E / X).
+5. Defeat the Hollow General. Parry by guarding just before its blows land, then strike.
+
+A tracker, a waypoint light, mission cards and a debrief with your time guide the run. Progress saves under `komorebi-mission-v1`. Reading the marker again after completion replays the run.
+
+## Free-running
+
+- **Collision:** halls, posts, lanterns and the cloister wall are solid.
+- **Walkable surfaces:** roofs, post tops, wall tops and lantern caps.
+- **Mantle:** jump at a ledge up to 1.9 m high and you pull yourself up.
+- **Wall-climb kick:** run into a taller wall mid-jump and you kick up it.
+- **Wall-run and wall-jump:** sprint-leap alongside a wall to run it, and jump during the run to kick off.
+- **Roll:** hold a direction through a hard landing to roll and keep momentum.
+
+The rules live in `src/parkour.js` and the course in `src/free-run-course.js`. The authored architecture comes from the Blender shrine kit (`src/assets/shrine-kit.glb`). Its source, renders and validation are in the workspace's `creations/komorebi-shrine-kit/version-001/`. `npm run test:mission` plays the whole mission through a synthetic gamepad.

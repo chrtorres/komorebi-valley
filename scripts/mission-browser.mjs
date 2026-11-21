@@ -210,6 +210,11 @@ try {
   await page.waitForFunction(() => window.valley?.state.frames > 10);
   const after = await state();
   check("completion and best time persist across reload", after.mission.stage === 6 && after.mission.completed && after.mission.best > 0);
+  // Regression: a programmatic click() (as a gamepad menu press dispatches) must change scenes.
+  // The ink-veil interceptor once re-clicked synchronously and browsers drop nested click()s.
+  await page.evaluate(() => document.getElementById("storm-enter").click());
+  await page.waitForTimeout(300);
+  check("programmatic click on Enter the Celestial Storm changes scenes", (await state()).storm.active === true);
 } catch (error) {
   check("mission playthrough", false, error.message);
   await shot("failure").catch(() => {});
