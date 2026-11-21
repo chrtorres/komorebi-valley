@@ -11,13 +11,9 @@ const pending = new Map();
 let loader;
 export function loadSpecimen(T, variety) {
   if (!loader) {
-    const manager = new T.LoadingManager().setURLModifier(url => {
-      if (url === "draco_wasm_wrapper.js") return decoderScript;
-      if (url === "draco_decoder.wasm") return decoderBinary;
-      return url;
-    });
-    loader = new GLTFLoader(manager).setDRACOLoader(new DRACOLoader(manager)
-      .setDecoderConfig({ type: "wasm" }).setWorkerLimit(2));
+    // three r187 resolves decoder files to absolute URLs, so hand it the bundled URLs explicitly.
+    loader = new GLTFLoader().setDRACOLoader(new DRACOLoader()
+      .setDecoderPath({ js: decoderScript, wasm: decoderBinary }).setWorkerLimit(2));
   }
   if (!pending.has(variety)) {
     pending.set(variety, loader.loadAsync(assets[variety]).then(({ scene }) => ({

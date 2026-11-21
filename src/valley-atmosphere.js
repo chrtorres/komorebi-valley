@@ -116,10 +116,10 @@ export function enhanceAtmosphere(T, scene, world) {
     depthWrite: false,
     uniforms: {
       sunDirection: { value: sunlight },
-      zenith: { value: new T.Color("#657f9a") },
-      horizon: { value: new T.Color("#c9cdca") },
-      lowerSky: { value: new T.Color("#aababb") },
-      dawn: { value: new T.Color("#f5b68a") },
+      zenith: { value: new T.Color("#3d76b8") },
+      horizon: { value: new T.Color("#e6e2d6") },
+      lowerSky: { value: new T.Color("#c4d0d4") },
+      dawn: { value: new T.Color("#ffb37c") },
     },
     vertexShader: `
       varying vec3 skyDirection;
@@ -275,8 +275,8 @@ export function enhanceAtmosphere(T, scene, world) {
     valleyVariation: { value: dataTexture(variation, 1) },
     valleyMistActive: { value: 1 },
     valleySun: { value: sunlight },
-    valleyAir: { value: new T.Color("#a7bec2") },
-    valleyWarmMist: { value: new T.Color("#e3bb9e") },
+    valleyAir: { value: new T.Color("#b4cad6") },
+    valleyWarmMist: { value: new T.Color("#f1c6a2") },
     valleyFloorMist: { value: new T.Color("#c6cbc1") },
   };
   const shaded = new Set();
@@ -366,7 +366,7 @@ export function enhanceAtmosphere(T, scene, world) {
   });
 
   // Match low-altitude sky haze without replacing the world's fog model/range.
-  if (baseFog?.color) baseFog.color.set("#adc0c1");
+  if (baseFog?.color) baseFog.color.set("#bccfd8");
   scene.userData.valleyAtmosphere = sky;
   return sky;
 }

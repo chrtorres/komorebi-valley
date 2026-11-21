@@ -78,7 +78,7 @@ export function createLeafCards(T, capacity) {
 
 export function createGrassGeometry(T) {
   const positions = [], colors = [], indices = [];
-  const root = new T.Color("#46543d"), fold = new T.Color("#8b9a73"), tip = new T.Color("#bbc694");
+  const root = new T.Color("#3b4e2f"), fold = new T.Color("#86a463"), tip = new T.Color("#c9d98e");
   // Bent, tapering blades catch light higher up and shade the roots into the terrain.
   for (const [angle, height, bend, width] of [[.35, .32, .16, .032], [2.43, .22, .19, .029], [4.45, .29, .15, .027]]) {
     const x = Math.cos(angle), z = Math.sin(angle), start = positions.length / 3;

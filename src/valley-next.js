@@ -9,6 +9,10 @@ import { enhanceAtmosphere } from "./valley-atmosphere.js";
 import { createCombatRuntime } from "./combat-runtime.js";
 import { createStormRuntime } from "./storm-runtime.js";
 import { createValleyRender, GRAPHICS_TIERS } from "./valley-render.js";
+import { createPolish } from "./aaa-polish.js";
+import { landingRetention, pushOff, stepLocomotion } from "./locomotion-physics.js";
+import { createInterface } from "./aaa-interface.js";
+import "./aaa.css";
 import { orbitLookAngle, orbitPitch, placeOrbitCamera } from "./camera-orbit.js";
 import {
   readJourney,
@@ -166,7 +170,10 @@ let restored = initial.lit,
   previous = [],
   frames = 0,
   ascentCamera = 0,
-  orbitDistance = 6.6;
+  orbitDistance = 6.6,
+  landingDip = 0;
+// Horizontal body velocity (m/s); input accelerates it instead of setting it.
+const bodyVelocity = { x: 0, z: 0 };
 const requestedQuality = new URLSearchParams(location.search).get("quality");
 let quality = GRAPHICS_TIERS.includes(requestedQuality) ? requestedQuality : "balanced";
 const litMaterial = new T.MeshStandardMaterial({
@@ -391,6 +398,7 @@ const storm = createStormRuntime(
     resetWarriorMotion = true;
     player.position.set(position.x, height(position.x, position.z), position.z);
     player.rotation.y = Math.PI;
+    bodyVelocity.x = bodyVelocity.z = 0;
     vault = null;
     leapDirection = null;
     launchBoost = 0;
@@ -404,9 +412,13 @@ const storm = createStormRuntime(
   () => sound,
 );
 const stormCameraObstacles = [...world.cameraObstacles, ...storm.cameraObstacles];
+const polish = createPolish(T, { scene, camera, world, root });
+const hud = createInterface({ root });
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = frameDelta(now, last);
+  // Hit-stop briefly slows simulation time; the real frame delta still drives presentation.
+  const realDt = frameDelta(now, last);
+  const dt = realDt * polish.timeScale;
   last = now;
   // Inactive tabs retain progress without advancing enemy AI or consuming GPU work.
   if (document.hidden) return;
@@ -425,7 +437,7 @@ function frame(now) {
     mz = (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   // Standard Xbox button edges prevent a held X from activating repeatedly.
   if (pad) {
-    if (!storm.active && pad.buttons[9]?.pressed && !previous[9]) storm.enter();
+    if (!storm.active && pad.buttons[9]?.pressed && !previous[9]) hud.transition(() => storm.enter(), "storm");
     mx += deadzone(pad.axes[0]);
     mz += deadzone(pad.axes[1]);
     yaw -= deadzone(pad.axes[2]) * dt * 2;
@@ -439,6 +451,8 @@ function frame(now) {
   } else {
     // A reconnect may report A already held. Wait for a release before accepting a jump edge.
     if (previous.length) padJumpNeedsRelease = true;
+    // Losing the controller is a loss of intent: shed carried momentum rather than drift on.
+    if (previous.length) bodyVelocity.x = bodyVelocity.z = 0;
     previous = [];
     $("#controller").textContent = "Keyboard ready · connect Xbox controller";
   }
@@ -470,6 +484,7 @@ function frame(now) {
     launchBoost = leapDirection ? .30 : 0;
     // Keep the ordinary jump impulse until combat has accepted the vault.
     vy = leapDirection ? 7.8 : 7;
+    if (!vault) pushOff(bodyVelocity, dx, dz, { leap: !!leapDirection, speed });
     grounded = false;
     contemplating = false;
   }
@@ -511,12 +526,19 @@ function frame(now) {
     launchBoost = 0;
   }
   let vaultFrame = vault ? vaultPose(vault, vault.elapsed) : null;
+  if (vaultFrame) bodyVelocity.x = bodyVelocity.z = 0;
+  else stepLocomotion(bodyVelocity, {
+    dirX: dx, dirZ: dz, maxSpeed: speed * movementScale, grounded, dt,
+    stance: Boolean(combatState.targetId || (storm.active ? storm.state.combat?.player : combatState.player)?.guarding ||
+      ((storm.active ? storm.state.combat?.player : combatState.player)?.action ?? "idle") !== "idle"),
+    height: storm.active ? storm.height : height, x: player.position.x, z: player.position.z,
+  });
   const nextX = T.MathUtils.clamp(
-    player.position.x + (dx * speed + (leapDirection?.x ?? 0) * boost) * dt * movementScale + combatState.motion.dx,
+    player.position.x + (bodyVelocity.x + (leapDirection?.x ?? 0) * boost * movementScale) * dt + combatState.motion.dx,
     -70, 70,
   );
   const nextZ = T.MathUtils.clamp(
-    player.position.z + (dz * speed + (leapDirection?.z ?? 0) * boost) * dt * movementScale + combatState.motion.dz,
+    player.position.z + (bodyVelocity.z + (leapDirection?.z ?? 0) * boost * movementScale) * dt + combatState.motion.dz,
     -70, 70,
   );
   const destination = vaultFrame ?? movePastVaultBarriers(player.position, nextX, nextZ, vaultBarriers);
@@ -559,6 +581,7 @@ function frame(now) {
         Math.hypot(w.x - player.position.x, w.z - player.position.z) < w.radius,
     );
   let landed = false;
+  const fallSpeed = vy;
   if (vaultFrame) {
     player.position.y = vaultFrame.y;
     grounded = landed = vaultFrame.progress === 1;
@@ -601,6 +624,20 @@ function frame(now) {
     } else grounded = false;
   }
   if (landed && leapDirection) leapRecovery = .34;
+  if (landed && !vaultFrame) {
+    // Touchdown: legs absorb part of the horizontal momentum and the camera dips with the impact.
+    const keep = landingRetention(fallSpeed);
+    bodyVelocity.x *= keep;
+    bodyVelocity.z *= keep;
+    if (!reducedMotion) landingDip = Math.min(.45, Math.max(landingDip, -fallSpeed * .028));
+  }
+  // Walls and clamps stop the body: keep velocity consistent with where it actually went.
+  if (dt > 0 && !vaultFrame) {
+    const movedX = (player.position.x - beforeX - combatState.motion.dx) / dt;
+    const movedZ = (player.position.z - beforeZ - combatState.motion.dz) / dt;
+    if (Math.abs(movedX) < Math.abs(bodyVelocity.x)) bodyVelocity.x = movedX;
+    if (Math.abs(movedZ) < Math.abs(bodyVelocity.z)) bodyVelocity.z = movedZ;
+  }
   if (grounded || storm.active || !combatRuntime.alive) leapDirection = null;
   const traveledX = player.position.x - beforeX, traveledZ = player.position.z - beforeZ;
   const travel = Math.hypot(traveledX, traveledZ);
@@ -644,7 +681,15 @@ function frame(now) {
   const distance = (contemplating ? 10 : 6.6) + ascentCamera * 0.65;
   const followRate = distance > orbitDistance ? 9 : 24;
   orbitDistance = T.MathUtils.lerp(orbitDistance, distance, reducedMotion ? 1 : 1 - Math.exp(-followRate * dt));
-  target.copy(player.position).y += 1.3 - ascentCamera * 0.25;
+  landingDip = Math.max(0, landingDip - realDt * 1.6);
+  target.copy(player.position).y += 1.3 - ascentCamera * 0.25 - Math.sin(Math.min(1, landingDip / .45) * Math.PI) * landingDip * .5;
+  // Field of view opens with ground speed to sell momentum.
+  const groundSpeed = Math.hypot(bodyVelocity.x, bodyVelocity.z);
+  const fov = 54 + (reducedMotion ? 0 : Math.max(0, groundSpeed - 3.6) * 1.1);
+  if (Math.abs(camera.fov - fov) > .01) {
+    camera.fov += (fov - camera.fov) * Math.min(1, realDt * 5);
+    camera.updateProjectionMatrix();
+  }
   const clearCamera = placeOrbitCamera(
     target, yaw, pitch, orbitDistance, height,
     storm.active ? stormCameraObstacles : world.cameraObstacles,
@@ -667,7 +712,18 @@ function frame(now) {
   world.pond.update(dt, player.position, camera.position, reducedMotion, storm.active);
   storm.render(dt, reducedMotion ? 0 : elapsed, !grounded);
   combatRuntime.render(dt, storm.active);
-  presentation.render(storm.active, dt);
+  const combatEvents = storm.active ? storm.state.combat?.events ?? [] : combatRuntime.state.events ?? [];
+  polish.update(realDt, elapsed, {
+    player, stormActive: storm.active, events: combatEvents, reduced: reducedMotion,
+    cinematic: contemplating ? 1 : 0,
+  });
+  hud.update(realDt, {
+    stormActive: storm.active,
+    engaged: !storm.active && combatRuntime.state.enemies?.some((e) => e.health > 0 &&
+      Math.hypot(e.x - player.position.x, e.z - player.position.z) < 16),
+    contemplating,
+  });
+  presentation.render(storm.active, realDt);
   frames++;
 }
 requestAnimationFrame(frame);
@@ -676,6 +732,7 @@ addEventListener("pagehide", save);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     keys.clear();
+    bodyVelocity.x = bodyVelocity.z = 0;
     jumpRequested = false;
     // A disconnect can occur while the animation loop is paused.
     padJumpNeedsRelease = true;

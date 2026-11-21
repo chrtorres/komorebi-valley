@@ -31,3 +31,13 @@ Buffer the next strike late in recovery. Light-light-light ends in a sweep; ligh
 ## Authored character
 
 The meter-scale pilgrim model is retained as `src/assets/pilgrim.glb`, with measurements beside it. Regenerate its source, GLB and review renders with Blender: `blender --background --python tools/create_pilgrim.py -- --output <review-directory> --height 1.8`. The original interactive review and asset-validation evidence remain in workspace `creations/komorebi-valley/version-002/`. This is a game asset, not an approved print model.
+
+## AAA presentation and physics pass
+
+- **Momentum locomotion** (`src/locomotion-physics.js`): input accelerates a body velocity instead of setting it. Ground traction ramps toward top speed, brakes and skids on release or reversal, slopes resist climbing and assist descent, air control steers without shedding leap momentum, jumps push off along the input, and hard landings absorb speed. Locked-on, guarding or attacking stances use planted footwork. Losing the controller or tab focus sheds momentum.
+- **Scenery** (`src/aaa-polish.js`): a snow-capped hero peak above the mist, a five-storey pagoda, wind-blown grass that parts around the Watchkeeper, GPU sakura petal drift, lantern halos with an ignition swell and embers, Storm rain and double-strike lightning.
+- **Feel**: hit-stop, trauma camera shake, parry/hit flashes, speed-scaled field of view and a landing camera dip. All are disabled by reduced motion.
+- **Transitions and HUD** (`src/aaa-interface.js`, `src/aaa.css`): title card, an ink-veil scene change with area banner between the Pass and the Storm, fading area titles and notices, H to show or tuck controls, the duel HUD only near wardens, and a letterboxed clean frame while contemplating.
+- Fixed: the authored sakura GLBs failed to decode under three r187 (Draco decoder URLs). They now load.
+
+Automated browsers (`navigator.webdriver`) skip the title card and swap scenes synchronously under the veil. Add `?title=1&veil=1` to exercise the player path.

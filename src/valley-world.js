@@ -29,16 +29,16 @@ export function createWorld(T, scene) {
   const pondY = rawHeight(POND_X, POND_Z) + 0.05;
   const height = (x, z) => pondHeight(x, z, rawHeight(x, z), pondY);
   scene.background = new T.Color("#bac8c5");
-  scene.fog = new T.FogExp2("#bac8c5", 0.008);
-  scene.add(new T.HemisphereLight("#dbe8f1", "#777059", 1.65));
+  scene.fog = new T.FogExp2("#bac8c5", 0.0068);
+  scene.add(new T.HemisphereLight("#d6e6f6", "#6f6a4c", 1.5));
   const fill = new T.DirectionalLight("#c1d8eb", 0.55);
   fill.position.set(24, 22, 48);
   scene.add(fill);
-  const sun = new T.DirectionalLight("#ffe0b5", 3.15);
+  const sun = new T.DirectionalLight("#ffd8a6", 3.7);
   sun.name = "Veiled Pass sunlight";
   sun.position.set(-31, 33, -62);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(4096, 4096);
   sun.shadow.camera.left = -65;
   sun.shadow.camera.right = 65;
   sun.shadow.camera.top = 65;
@@ -325,10 +325,10 @@ export function createWorld(T, scene) {
     roughness: 1,
   });
   grassMat.userData.valleySurface = "grass";
-  const grass = new T.InstancedMesh(createGrassGeometry(T), grassMat, 10700);
+  const grass = new T.InstancedMesh(createGrassGeometry(T), grassMat, 19200);
   scene.add(grass);
   let grassIndex = 0;
-  for (let i = 0; i < 8500; i++) {
+  for (let i = 0; i < 17000; i++) {
     let x = (rand() - 0.5) * 140,
       z = (rand() - 0.5) * 150;
     if (Math.abs(x - pathX(z)) < 2.3) {
@@ -336,11 +336,11 @@ export function createWorld(T, scene) {
     }
     dummy.position.set(x, height(x, z) - .012, z);
     dummy.rotation.set((rand() - 0.5) * 0.3, rand() * 6.28, 0);
-    dummy.scale.setScalar(0.5 + rand());
+    dummy.scale.setScalar(0.45 + rand() * 0.75);
     dummy.updateMatrix();
     if (pondRadius(x, z) >= .985) {
       grass.setMatrixAt(grassIndex, dummy.matrix);
-      grass.setColorAt(grassIndex++, foliageTint.set(i % 5 === 0 ? "#aa946b" : "#839374"));
+      grass.setColorAt(grassIndex++, foliageTint.set(i % 7 === 0 ? "#b4a06c" : i % 3 === 0 ? "#7f9f5c" : "#8aa866"));
     }
   }
   // Short banks of sedge trace the edge of the hand-laid path.
@@ -357,7 +357,7 @@ export function createWorld(T, scene) {
     dummy.scale.setScalar(.52 + .45 * (Math.sin(i * 3.1) * .5 + .5));
     dummy.updateMatrix();
     grass.setMatrixAt(grassIndex, dummy.matrix);
-    grass.setColorAt(grassIndex++, foliageTint.set(i % 6 === 0 ? "#b6a17a" : "#8e9c78"));
+    grass.setColorAt(grassIndex++, foliageTint.set(i % 6 === 0 ? "#b6a17a" : "#90aa6c"));
   }
   grass.count = grassIndex;
   for (let i = 0; i < 100; i++) {
