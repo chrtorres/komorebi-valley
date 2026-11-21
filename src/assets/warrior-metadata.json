@@ -1,7 +1,7 @@
 {
-  "source": "The Veiled Pass Watchkeeper, version 005",
-  "runtimeSha256": "c692f233f643a1e5f3567f419765e033da74f5b0ec0a8f82eb479af6ac0bbfe0",
-  "triangles": 82748,
+  "source": "The wandering ronin, valley-warrior version-006 (after references-projects/samurai images (3).jpeg)",
+  "runtimeSha256": "f20df54034659ce1f58f4d634e11352087b70a8fbc750c50cad6e2a77bf6b0d4",
+  "triangles": 49948,
   "units": "meters",
   "axes": "+Y up, +Z forward",
   "anatomy": {

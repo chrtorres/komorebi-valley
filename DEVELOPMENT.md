@@ -87,14 +87,28 @@ A jump pressed together with combat input remains a combat jump. The test
 suite checks an angled jump and aerial light attack at 240 Hz. On reconnect,
 release A before using it to jump or vault again.
 
-## Watchkeeper appearance and animation
+## Ronin appearance and animation
 
-The v005 GLB uses UV-mapped skin, eyes and brows, with a facial blink target.
-Lacquer, iron, linen and woven armor have embedded color and normal maps.
-Exploration wears the forged helmet and mask. Celestial Storm fits the
-indigo hood to the animated head and shows the face, with a continuous cloth
-scarf that follows movement. The asset's provenance and runtime hash are
-in `src/assets/warrior-metadata.json`.
+The v006 GLB recasts the player character as a wandering ronin: a straw
+kasa, face wrap and head wrap over UV-mapped skin, eyes and brows with a
+facial blink target, and a tattered black robe with a crimson neck wrap.
+Skin, iron, black robe, crimson, straw and wrap materials embed color and
+normal maps. The ronin keeps the same attire in both exploration modes.
+Two crimson scarf tails (`src/ronin-scarf.js`) hang from the
+`RoninScarfAnchor` node as world-space Verlet cloth with gravity, drag, a
+light breeze. They collide with the ronin's measured silhouette (cape, robe
+and legs), which rides the chest and pelvis bones through running lean, bank
+and crouch. They replace the Storm's cloth scarf. The
+held weapon is a curved katana with tsuba, habaki and wrapped tsuka. The
+asset's provenance and runtime hash are in `src/assets/warrior-metadata.json`;
+the Blender source lives in the workspace's `creations/valley-warrior/version-006/`.
+
+Free running faces the body's velocity. At speed, ground turns curve the
+velocity within a lateral-grip limit (`LOCOMOTION.lateralGrip`) and scrub a
+little speed in tight corners. Only near-reversals (beyond about 130°) plant
+and skid. The visible body banks into curves (lean = atan(v·ω / g), capped),
+and the lazy camera follow recentres only on a straight-ahead stick, so
+diagonal running does not spiral.
 
 The stride solver rolls the support foot around the heel or toe, holds its
 contact through changes of pace, and adjusts the next swing to the new speed.
@@ -109,7 +123,7 @@ The procedural feet use the player's local floor plane. The game owns
 traversal, hit detection and saves.
 
 The production gate checks the served asset bytes, live eyelid motion, the
-hood and mask changeover, airborne cloth geometry, combat grip parenting,
+kasa, face wrap and scarf in both modes, airborne scarf-tail cloth geometry, combat grip parenting,
 and the existing keyboard, simulated Xbox and save regressions. Motion
 coverage includes lateral foot contacts and reversal at 20 and 60 Hz and an
 in-game synthetic stick turn through the shipped model. Visual review

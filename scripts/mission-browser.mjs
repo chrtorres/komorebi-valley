@@ -39,8 +39,14 @@ await page.waitForFunction(() => window.valley?.state.frames > 30 && window.vall
 await page.evaluate(() => {
   const pad = window.testPad;
   const set = (i, on) => { pad.buttons[i] = { pressed: on, value: on ? 1 : 0 }; };
-  const tap = (i) => { set(i, true); setTimeout(() => set(i, false), 90); };
   const S = () => window.valley.state;
+  // Hold for at least 90 ms and two rendered frames, so slow software rendering sees it.
+  const tap = (i) => {
+    set(i, true);
+    const f0 = S().frames, t0 = performance.now();
+    const up = () => S().frames >= f0 + 2 && performance.now() - t0 >= 90 ? set(i, false) : requestAnimationFrame(up);
+    requestAnimationFrame(up);
+  };
   function steer(wx, wz, sprint) {
     // Invert the game's camera-relative mapping so the stick pushes toward (wx, wz).
     const len = Math.hypot(wx, wz) || 1, c = Math.cos(S().yaw), s = Math.sin(S().yaw);
@@ -56,16 +62,25 @@ await page.evaluate(() => {
     go(target, { sprint = false, jump = null, jump2 = null, done, timeout = 15000, aim = null } = {}) {
       return new Promise((resolve, reject) => {
         const t0 = performance.now();
-        let jumped = false, jumped2 = false;
+        let jumped = false, jumped2 = false, jumpedAt = 0, px = null, pz = 0, pt = 0, speed = 0;
         const tick = () => {
-          const st = S(), [x, , z] = st.position;
+          const st = S(), [x, , z] = st.position, now = performance.now();
+          if (px !== null && now > pt) speed = Math.hypot(x - px, z - pz) / ((now - pt) / 1000);
+          px = x; pz = z; pt = now;
+          // Rolling per-frame trace for failure diagnosis.
+          const log = window.pilotLog ??= [];
+          log.push([+(performance.now() - t0).toFixed(0), ...st.position.map((v) => +v.toFixed(2)), st.grounded ? 1 : 0, st.parkour.wallRun ? 1 : 0, st.parkour.mantle ? 1 : 0, pad.axes[0].toFixed(2), pad.axes[1].toFixed(2), pad.buttons[0].pressed ? 1 : 0, jumped ? 1 : 0, jumped2 ? 1 : 0]);
+          if (log.length > 900) log.shift();
           const d = Math.hypot(target.x - x, target.z - z);
-          if (done(st, d)) { release(); return resolve({ ms: performance.now() - t0, position: st.position }); }
+          if (done(st, d, speed)) { release(); return resolve({ ms: performance.now() - t0, position: st.position }); }
           if (performance.now() - t0 > timeout) { release(); return reject(new Error(`autopilot timeout toward ${JSON.stringify(target)} at ${JSON.stringify(st.position)} stage ${st.mission.stage}`)); }
           const a = aim ? aim(st) : target;
-          if (st.grounded && d < .3 && !jump) release();
+          // Real bodies cannot stop dead: release early enough to brake (4.5 m/s²) onto the spot.
+          if (st.grounded && !jump && d < speed * speed / 9 + .25) release();
           else steer(a.x - x, a.z - z, sprint && !(st.grounded && d < 1.2 && st.position[1] > window.valley.world.height(x, z) + .8));
-          if (jump && !jumped && st.grounded && jump(st, d)) { jumped = true; tap(0); }
+          // A missed jump is retried once back on the ground, as a player would.
+          if (jumped && st.grounded && now - jumpedAt > 450) jumped = jumped2 = false;
+          if (jump && !jumped && st.grounded && jump(st, d)) { jumped = true; jumpedAt = now; tap(0); }
           else if (jump2 && jumped && !jumped2 && !st.grounded && jump2(st, d)) { jumped2 = true; tap(0); }
           requestAnimationFrame(tick);
         };
@@ -75,11 +90,13 @@ await page.evaluate(() => {
   };
 });
 const go = (target, opts) => page.evaluate(([t, o]) => {
-  const fn = (src) => src && new Function("st", "d", src);
+  const fn = (src) => src && new Function("st", "d", "speed", src);
   return window.pilot.go(t, { ...o, jump: fn(o.jump), jump2: fn(o.jump2), done: fn(o.done), aim: o.aim && new Function("st", o.aim) });
 }, [target, opts]);
 const state = () => page.evaluate(() => window.valley.state);
-const shot = (name) => page.screenshot({ path: path.join(evidence, `${name}.png`) });
+// Screenshots are evidence, not checks: a stalled software renderer is recorded, not fatal.
+const shot = (name) => page.screenshot({ path: path.join(evidence, `${name}.png`), timeout: 60000 })
+  .catch((e) => report.timeline.push({ label: `screenshot ${name} skipped`, error: e.message.split("\n")[0] }));
 const mark = async (label) => report.timeline.push({ label, t: Date.now(), state: await state() });
 
 try {
@@ -105,20 +122,22 @@ try {
   await shot("01-mission-card");
   await mark("start");
 
-  // 1 · Reach the cloister: run the lantern path to the first post.
-  await go({ x: 5.6, z: -42.9 }, { sprint: true, done: "return st.mission.stage >= 2", timeout: 30000 });
+  // 1 · Reach the cloister: run the lantern path to just east of the first post.
+  const posts = await page.evaluate(() => window.valley.freeRun.course.solids
+    .filter((s) => /^post-/.test(s.name)).map((s) => [s.cx, s.cz]));
+  const approach = { x: posts[0][0] + 2.9, z: posts[0][1] };
+  await go(approach, { sprint: true, done: "return st.mission.stage >= 2", timeout: 30000 });
   check("objective 1 reached on foot", (await state()).mission.stage === 2);
-  await go({ x: 5.6, z: -42.9 }, { done: "return d < .35", timeout: 6000 });
+  await go(approach, { done: "return d < .35 && speed < .3", timeout: 9000 });
   await shot("02-cloister");
 
-  // 2 · Free-run the posts: sprint leaps with automatic pull-ups.
-  const posts = [[3.2, -42.9], [-3.1, -42.8], [-9.4, -42.7]];
+  // 2 · Free-run the posts: real-world jumps with pull-ups (geometry read from the game).
   for (const [i, [x, z]] of posts.entries()) {
     const startD = i === 0 ? null : Math.hypot(x - posts[i - 1][0], z - posts[i - 1][1]);
     await go({ x, z }, {
-      // A plain hop onto the low first post; sprint leaps span the 4.4 m gaps after it.
+      // A running jump and pull-up onto the first post; then jump from each rim.
       sprint: i > 0,
-      jump: i === 0 ? "return d < 2.1" : `return d < ${(startD - .2).toFixed(2)}`,
+      jump: i === 0 ? "return d < 2.1" : `return d < ${(startD - .65).toFixed(2)}`,
       // On top: grounded well above the terrain within the post's footprint.
       done: "return st.grounded && Math.hypot(st.position[0] - " + x + ", st.position[2] - " + z + ") < .8 && st.position[1] > " + `window.valley.world.height(${x}, ${z}) + .8`,
       timeout: 6000,
@@ -130,20 +149,24 @@ try {
   check("leapt and mantled all three stone posts", onLast.mission.stage === 3, `stage ${onLast.mission.stage}`);
   await shot("03-last-post");
 
-  // 3 · Wall-run the cloister wall onto the shrine roof.
+  // 3 · Drop into the corridor north of the cloister wall, sprint, run the wall and kick
+  // off north onto the eave.
   const runSeen = page.evaluate(() => new Promise((resolve) => {
     const t0 = performance.now();
-    const poll = () => window.valley.state.parkour.wallRun ? resolve(true) : performance.now() - t0 > 6000 ? resolve(false) : requestAnimationFrame(poll);
+    const poll = () => window.valley.state.parkour.wallRun ? resolve(true) : performance.now() - t0 > 9000 ? resolve(false) : requestAnimationFrame(poll);
     poll();
   }));
-  await go({ x: -15, z: -42.95 }, {
+  await go({ x: -10.35, z: -42.72 }, { done: "return st.grounded && d < .35 && speed < .3", timeout: 9000 });
+  await page.evaluate(() => window.pilot.release());
+  await page.waitForTimeout(250);
+  await go({ x: -18, z: -42.72 }, {
     sprint: true,
-    jump: "return Math.hypot(st.position[0] + 9.4, st.position[2] + 42.7) > .2",
-    jump2: "return st.parkour.wallRun && st.position[0] < -13.0",
-    // Angle in to hug the wall, then run its length.
-    aim: "return st.parkour.wallRun || st.position[0] < -11.4 ? { x: -18, z: -42.85 } : { x: -11.6, z: -43.05 }",
+    jump: "return st.position[0] < -12.0",
+    jump2: "return st.parkour.wallRun && st.position[0] < -13.4",
+    // Run the face, then steer north for the kick and the pull-up onto the eave.
+    aim: "return !st.grounded && !st.parkour.wallRun && st.position[0] < -13.4 ? { x: st.position[0], z: -40.5 } : { x: -18, z: -42.72 }",
     done: "return st.mission.stage >= 4",
-    timeout: 8000,
+    timeout: 9000,
   });
   check("wall-run engaged along the cloister wall", await runSeen);
   check("reached the shrine roof (objective 3)", (await state()).mission.stage === 4);
@@ -218,6 +241,8 @@ try {
 } catch (error) {
   check("mission playthrough", false, error.message);
   await shot("failure").catch(() => {});
+  report.pilotLog = { columns: ["ms", "x", "y", "z", "grounded", "wallRun", "mantle", "axisX", "axisY", "A", "jumped", "jumped2"],
+    frames: await page.evaluate(() => window.pilotLog ?? []).catch(() => []) };
 } finally {
   check("no page errors", report.errors.length === 0, report.errors.slice(0, 3).join(" | "));
   report.passed = report.checks.filter((c) => c.ok).length;

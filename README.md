@@ -34,8 +34,8 @@ The meter-scale pilgrim model is retained as `src/assets/pilgrim.glb`, with meas
 
 ## AAA presentation and physics pass
 
-- **Momentum locomotion** (`src/locomotion-physics.js`): input accelerates a body velocity instead of setting it. Ground traction ramps toward top speed, brakes and skids on release or reversal, slopes resist climbing and assist descent, air control steers without shedding leap momentum, jumps push off along the input, and hard landings absorb speed. Locked-on, guarding or attacking stances use planted footwork. Losing the controller or tab focus sheds momentum.
-- **Scenery** (`src/aaa-polish.js`): a snow-capped hero peak above the mist, a five-storey pagoda, wind-blown grass that parts around the Watchkeeper, GPU sakura petal drift, lantern halos with an ignition swell and embers, Storm rain and double-strike lightning.
+- **Momentum locomotion** (`src/locomotion-physics.js`): input accelerates a body velocity instead of setting it. Ground traction follows a sprint force-velocity curve, braking and cutting are friction-limited, slopes resist climbing and assist descent, flight is ballistic (no air steering), jumps push off along the input, and hard landings absorb speed. Locked-on, guarding or attacking stances use planted footwork. Losing the controller or tab focus sheds momentum.
+- **Scenery** (`src/aaa-polish.js`): a snow-capped hero peak above the mist, a five-storey pagoda, wind-blown grass that parts around the ronin, GPU sakura petal drift, lantern halos with an ignition swell and embers, Storm rain and double-strike lightning.
 - **Feel**: hit-stop, trauma camera shake, parry/hit flashes, speed-scaled field of view and a landing camera dip. All are disabled by reduced motion.
 - **Transitions and HUD** (`src/aaa-interface.js`, `src/aaa.css`): title card, an ink-veil scene change with area banner between the Pass and the Storm, fading area titles and notices, H to show or tuck controls, the duel HUD only near wardens, and a letterboxed clean frame while contemplating.
 - Fixed: the authored sakura GLBs failed to decode under three r187 (Draco decoder URLs). They now load.
@@ -57,9 +57,29 @@ A tracker, a waypoint light, mission cards and a debrief with your time guide th
 
 - **Collision:** halls, posts, lanterns and the cloister wall are solid.
 - **Walkable surfaces:** roofs, post tops, wall tops and lantern caps.
-- **Mantle:** jump at a ledge up to 1.9 m high and you pull yourself up.
+- **Mantle:** hold toward a ledge within fingertip reach (2.39 m above your feet) and you pull yourself up; higher ledges take longer.
 - **Wall-climb kick:** run into a taller wall mid-jump and you kick up it.
 - **Wall-run and wall-jump:** sprint-leap alongside a wall to run it, and jump during the run to kick off.
-- **Roll:** hold a direction through a hard landing to roll and keep momentum.
+- **Roll:** hold a direction through a landing harder than a 2 m drop to roll and keep momentum.
+
+## Real-world physics baseline
+
+Traversal starts from measured human movement. Gameplay tuning builds up from this baseline. `BODY` in `src/locomotion-physics.js` is the single source. Locomotion and parkour values derive from it.
+
+| Quantity | Value | Basis |
+| --- | --- | --- |
+| Gravity | 9.81 m/s² | — |
+| Walk / run / sprint | 1.4 / 3.5 / 7.5 m/s | preferred walking pace; easy run; fit recreational sprint |
+| Sprint acceleration | a = 8 (1 − v/8.5) m/s² | force-velocity sprint model; 30 m in about 4.8 s |
+| Grip (cut, skid) | μg = 5.9 m/s², μ = 0.6 | rubber on dry stone; runners slow to cut |
+| Force development | acceleration eases in over 80 ms; friction circle caps total force at μg | starts, stops and cuts never switch within a frame |
+| Pivot | facing turns at up to 10 rad/s (180° in about 0.3 s) | planted reversals rotate the body instead of snapping it |
+| Comfortable stop | 4.5 m/s² | 6.25 m from a sprint |
+| Air | ballistic, quadratic drag (terminal ≈ 47 m/s) | no air steering |
+| Jump / leap takeoff | 2.7 / 3.3 m/s (0.37 / 0.55 m rise) | countermovement jump; real-time flip in the reference footage, 0.667 s flight |
+| Reach | 2.39 m (1.33 × 1.8 m) | standing fingertip reach |
+| Hard landing | 6.3 m/s (2 m drop) | — |
+
+Gliding and mountain thermals remain deliberate non-physical abilities. Celestial Storm movement and the duel combat core keep their own tuning. `npm run test:unit` includes `scripts/real-physics.test.mjs`. It checks these values and runs every course hop in a headless simulation with the same functions the game uses.
 
 The rules live in `src/parkour.js` and the course in `src/free-run-course.js`. The authored architecture comes from the Blender shrine kit (`src/assets/shrine-kit.glb`). Its source, renders and validation are in the workspace's `creations/komorebi-shrine-kit/version-001/`. `npm run test:mission` plays the whole mission through a synthetic gamepad.

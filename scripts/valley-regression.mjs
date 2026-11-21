@@ -131,8 +131,11 @@ try {
     });
   }
   await test('key release stops travel', async p => {
-    await hold(p, 'KeyW'); await settle(p); const before = await position(p); await advance(p, 400);
-    assert(distance(before, await position(p)) < .03);
+    // Real braking from a 3.5 m/s run: v²/2a + v·τ (force rise) = 1.36 + 0.28 ≈ 1.64 m, then it stays put.
+    await hold(p, 'KeyW'); const released = await position(p); await advance(p, 1000);
+    const before = await position(p), slide = distance(released, before);
+    assert(slide < 1.8, `slide ${slide} exceeds braking distance`);
+    await advance(p, 400); assert(distance(before, await position(p)) < .03);
   });
   await test('third person follows moving player', async p => {
     const offset = () => p.evaluate(() => window.valley.camera.position.clone().sub(window.valley.player.position).toArray());
@@ -140,7 +143,9 @@ try {
     assert(Math.hypot(...after) > 3); assert(Math.hypot(...after.map((v, i) => v - before[i])) < .3);
   });
   await test('keyboard jump rises', async p => {
-    const before = await position(p); await hold(p, 'Space', 200); assert((await position(p))[1] > before[1] + .4);
+    // A real 2.7 m/s jump: about 0.34 m up at 0.2 s, never above its 0.37 m peak.
+    const before = await position(p); await hold(p, 'Space', 200); const rise = (await position(p))[1] - before[1];
+    assert(rise > .25 && rise < .42, `rise ${rise}`);
   });
   await test('lantern out of range stays dark', async p => {
     await near(p, 0, 4); await p.evaluate(() => window.valley.interact()); assert.deepEqual(await p.evaluate(() => window.valley.state.lit), []);
@@ -190,7 +195,7 @@ try {
   });
   await test('Xbox A jumps', async p => {
     await p.evaluate(() => window.__connected = true); const before = await position(p); await pad(p, { buttons: [0] }); await advance(p, 200);
-    assert((await position(p))[1] > before[1] + .4);
+    const rise = (await position(p))[1] - before[1]; assert(rise > .25 && rise < .42, `rise ${rise}`);
   });
   await test('Xbox X interacts and held press is idempotent', async p => {
     await near(p); await p.evaluate(() => window.__connected = true); await pad(p, { buttons: [2] }); await advance(p, 400);
@@ -274,9 +279,11 @@ try {
   await test('thermal held jump gains sustained terrain relative height', async p => {
     await p.evaluate(() => { const v = window.valley; v.player.position.set(10, v.world.height(10, -20), -20); });
     await settle(p); const ground = await p.evaluate(() => window.valley.world.height(10, -20));
-    await hold(p, 'Space', 800); const lifted = (await position(p))[1];
+    // Thermals are a non-physical ability layered on a real 2.7 m/s jump.
+    await hold(p, 'Space', 1200); const lifted = (await position(p))[1];
     assert(lifted > ground + 4, `thermal rise was ${lifted - ground}`);
-    await advance(p, 1200); assert((await position(p))[1] < lifted, 'releasing jump must restore descent');
+    // Leaving the thermal at up to 8 m/s, real gravity needs 0.8 s to turn the climb and ~1.6 s to fall back.
+    await advance(p, 2000); assert((await position(p))[1] < lifted, 'releasing jump must restore descent');
   });
   await test('airborne jump press cannot restart ascent', async p => {
     await p.evaluate(() => { const v = window.valley, [x,,z] = v.state.position; v.player.position.y = v.world.height(x,z) + 6; });

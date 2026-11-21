@@ -12,8 +12,8 @@ export const GENERAL_ID = "hollow-general";
 export const STAGES = [
   null,
   { title: "Reach the ruined cloister", hint: "Follow the lantern path south past the second gate. The stone posts stand west of the path behind the shrine." },
-  { title: "Free-run the stone posts", hint: "Sprint (Shift / RT) and jump to leap. Run into a ledge to pull yourself up." },
-  { title: "Reach the shrine roof", hint: "Sprint-leap from the last post along the cloister wall to run it, then jump to kick off north onto the roof." },
+  { title: "Free-run the stone posts", hint: "Jump from post to post. Hold toward a ledge you fall short of to catch it and pull yourself up." },
+  { title: "Reach the shrine roof", hint: "Jump north from the last post and pull onto the eave, or sprint beside the cloister wall, run it and kick off north." },
   { title: "Light the signal beacon", hint: "Climb the roof to the ridge. E / X lights the brazier." },
   { title: "Defeat the Hollow General", hint: "It wakes in the open field south of the cloister. Guard (Q / LT) just before its blows land to parry, then strike." },
 ];

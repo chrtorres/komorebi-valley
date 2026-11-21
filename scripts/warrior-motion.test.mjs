@@ -331,7 +331,7 @@ test("export contains the complete rig and bounded runtime geometry", () => {
   assert(design.meshes.flatMap(mesh => mesh.primitives).length <= 120, "character draw groups stay bounded");
 });
 
-test("character export embeds the skin, eyelids, armor and alternative hood", () => {
+test("character export embeds the skin, eyelids, kasa, face wrap and head wrap", () => {
   const asset = readFileSync(new URL("../src/assets/warrior.glb", import.meta.url));
   const design = JSON.parse(asset.toString("utf8", 20, 20 + asset.readUInt32LE(12)));
   const head = design.nodes.find(node => node.name === "WarriorHead");
@@ -345,7 +345,7 @@ test("character export embeds the skin, eyelids, armor and alternative hood", ()
   assert.deepEqual(face.extras.targetNames, ["Blink"]);
   assert(face.primitives.every(part => part.targets[0].POSITION !== undefined));
   assert(design.images.every(image => image.bufferView !== undefined && !image.uri));
-  for (const name of ["Weathered skin", "iron", "indigo", "red lacquer", "aged brass"]) {
+  for (const name of ["Weathered skin", "iron", "black robe", "crimson", "straw", "wrap"]) {
     const material = design.materials.find(item => item.name === name);
     assert(material.normalTexture);
     assert(material.pbrMetallicRoughness.baseColorTexture);

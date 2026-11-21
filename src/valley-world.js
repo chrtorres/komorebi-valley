@@ -4,6 +4,15 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { createKoiHabitat, pondHeight, pondRadius, POND_X, POND_Z } from "./koi/habitat.js";
 import { createLeafCards, createGrassGeometry } from "./valley-vegetation.js";
 import { createKitPlacer, placeTorii } from "./shrine-kit.js";
+const pathX = (z) => 5 + Math.sin((z - 16) * 0.055) * 8;
+const rawHeight = (x, z) =>
+  Math.sin(z * 0.045) * 1.4 +
+  Math.sin(x * 0.065) * 0.7 +
+  Math.max(0, -z - 12) * 0.11;
+const pondY = rawHeight(POND_X, POND_Z) + 0.05;
+/** Ground height (m). Pure, so physics and course checks can run headlessly. */
+export const terrainHeight = (x, z) => pondHeight(x, z, rawHeight(x, z), pondY);
+
 // Deterministic authored landscape: collision height and rendered ground share one function.
 export function createWorld(T, scene) {
   const cameraObstacles = [];
@@ -32,13 +41,7 @@ export function createWorld(T, scene) {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 4294967296;
   };
-  const pathX = (z) => 5 + Math.sin((z - 16) * 0.055) * 8;
-  const rawHeight = (x, z) =>
-    Math.sin(z * 0.045) * 1.4 +
-    Math.sin(x * 0.065) * 0.7 +
-    Math.max(0, -z - 12) * 0.11;
-  const pondY = rawHeight(POND_X, POND_Z) + 0.05;
-  const height = (x, z) => pondHeight(x, z, rawHeight(x, z), pondY);
+  const height = terrainHeight;
   scene.background = new T.Color("#bac8c5");
   scene.fog = new T.FogExp2("#bac8c5", 0.0068);
   scene.add(new T.HemisphereLight("#d6e6f6", "#6f6a4c", 1.5));

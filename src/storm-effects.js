@@ -485,11 +485,11 @@ export function createStormEffects(T, scene, player) {
       /^(?:backpack|pack[ _]|shoulder[ _]strap|brass[ _]buckle|rolled[ _]sleeping|bedroll[ _]tie|canteen|bottle[ _]stopper)/i.test(
         o.name,
       );
-    const hood = o.name === "WarriorStormHood";
-    if (hood || o.name === "PilgrimCombatWeapon" || o.name === "WarriorHelmet" ||
-        o.name === "WarriorMask" || isOriginalHat(o) || travel) {
+    // The ronin keeps the kasa, face wrap and head wrap in the Storm; only the
+    // valley weapon and legacy pilgrim gear give way to the Storm arsenal.
+    if (o.name === "PilgrimCombatWeapon" || isOriginalHat(o) || travel) {
       if (!hidden.has(o)) hidden.set(o, o.visible);
-      o.visible = hood;
+      o.visible = false;
     }
     if (!o.isMesh || wardrobe.has(o)) return;
     const original = o.material,
@@ -600,6 +600,8 @@ export function createStormEffects(T, scene, player) {
     if (costume.parent !== player) player.add(costume);
     const fittedHood = player.getObjectByName("WarriorStormHood");
     fallbackCostume.visible = !fittedHood;
+    // The ronin's own crimson scarf replaces the Storm cloth scarf.
+    scarfMesh.visible = !player.getObjectByName("RoninScarfAnchor");
     player.traverse(dressOriginal);
     const grip = player.getObjectByName("RightGrip");
     const arm = grip || player.getObjectByName("RightArm");

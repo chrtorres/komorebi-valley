@@ -9,11 +9,11 @@ import { roofHeight } from "./parkour.js";
 
 export const HALLS = [[-15, -37], [15, -65]];
 export const COURSE = {
-  // Spaced 6.3 m: a level sprint leap (about 7 m/s forward, 7.8 m/s up) comes down onto the
-  // next post's 1.5 m wide top; a plain hop reaches the low first post from the path.
-  // The line runs between the cloister wall and the roof's back eave. The last post is
-  // too low to reach the roof directly: the route is a wall-run and a wall-jump north.
-  posts: [[3.2, -42.9, .9], [-3.1, -42.8, 1.3], [-9.4, -42.7, 1.5]], // x, z, height above own ground
+  // Spaced 3.4 m on a real-world baseline: the rims are 1.9 m apart, within a standing
+  // jump (1.3 m) plus a catch-and-pull-up. From the path the first post needs a leap and a
+  // pull-up. The last post's top is 2.3 m below the roof's back corner: jump and pull up,
+  // or sprint the corridor north of the cloister wall, run it and kick off onto the eave.
+  posts: [[-2.6, -42.9, .9], [-6.0, -42.8, 1.2], [-9.4, -42.7, 1.5]], // x, z, height above own ground
   // South of the roof's back eave: the run ends in a wall-jump north onto the roof.
   wall: { x0: -10.6, x1: -16.0, z: -43.4, thickness: .45, topAboveHall: 5.6 },
   beaconHall: 0, // index into HALLS

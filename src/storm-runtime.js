@@ -315,7 +315,9 @@ export function createStormRuntime(
       Math.hypot(movement.moveX, movement.moveZ) > 0.1 &&
       !["startup", "active"].includes(snapshot.attack.phase)
     )
-      player.rotation.y = Math.atan2(movement.moveX, movement.moveZ);
+      player.rotation.y = movement.faceX !== undefined
+        ? Math.atan2(movement.faceX, movement.faceZ)
+        : Math.atan2(movement.moveX, movement.moveZ);
     if (input.lock && !snapshot.combat.targetId) {
       const enemy = snapshot.combat.enemies
         .filter((e) => e.health > 0)

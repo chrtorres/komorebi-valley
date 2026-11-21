@@ -42,7 +42,7 @@ test("mantle reaches ledges up to 1.9 m and lands on top", () => {
 });
 
 test("wall-climb kick only for faces too tall to mantle and run into head-on", () => {
-  const tall = { ...post, top: 3 };
+  const tall = { ...post, top: 2.7 };
   const c = course([tall]);
   assert.ok(findKick(c, .9, 0, -1, 0, 0));
   assert.equal(findKick(c, .9, 0, 0, 1, 0), null, "glancing");

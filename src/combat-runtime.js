@@ -121,6 +121,8 @@ export function createCombatRuntime(
         locked.x - player.position.x,
         locked.z - player.position.z,
       );
+    else if (movement.faceX !== undefined)
+      desired = Math.atan2(movement.faceX, movement.faceZ);
     else if (Math.hypot(movement.moveX, movement.moveZ) > 0.001)
       desired = Math.atan2(movement.moveX, movement.moveZ);
     // Capture one facing for the whole swing. A finishing buffered attack may capture a new facing.

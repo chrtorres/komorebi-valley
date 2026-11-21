@@ -8,21 +8,26 @@
 //             { kind: "box", cx, cz, hx, hz, top } walkable plinth with no blocking sides
 // Units: metres, seconds. Y up. `feet` is the body's foot height.
 
+import { BODY, LOCOMOTION } from "./locomotion-physics.js";
+
+// Real-world baseline, derived from BODY where a measurement exists.
 export const PARKOUR = Object.freeze({
-  radius: .32,        // body radius against scenery
-  step: .55,          // ledge height walked up without a mantle
-  mantleMax: 1.9,     // highest ledge (above feet) the hands can pull onto
-  mantleTime: .42,    // seconds for a pull-up
-  kickMax: 3.4,       // a wall-climb kick reaches ledges up to this height above the feet
-  kickSpeed: 7.4,     // upward m/s from a wall-climb kick
-  runMin: 4.2,        // horizontal m/s needed to start a wall-run
-  runTime: 1.2,       // longest wall-run
-  runGravity: 6.5,    // reduced gravity while running a wall (m/s^2)
-  runLift: 2.6,       // upward m/s when a wall-run starts
-  jumpAway: 5.4,      // wall-jump push away from the wall (m/s)
-  jumpUp: 7.4,        // wall-jump vertical speed
-  rollFall: 10.5,     // landing faster than this with input held becomes a roll
+  radius: .32,              // body radius against scenery (shoulders and robe)
+  step: .5,                 // knee-high ledge stepped onto without hands
+  mantleMax: BODY.reach,    // ledge (above the feet) the hands can catch and pull onto
+  kickMax: BODY.reach + .6, // one step up a wall raises the hands about 0.6 m more
+  kickSpeed: 3.5,           // upward m/s from a wall-climb step (≈ 0.6 m rise)
+  runMin: 3.5,              // horizontal m/s needed for the feet to hold a wall
+  runTime: .7,              // two or three steps along a wall
+  runGravity: BODY.g * .7,  // wall friction carries part of the weight while stepping
+  runLift: 2,               // upward m/s from the first wall step
+  jumpAway: 2.8,            // wall-jump push away from the wall (m/s)
+  jumpUp: 3.5,              // wall-jump: one step on the wall, as a climb kick
+  rollFall: LOCOMOTION.hardLanding, // land harder than a 2 m drop with input held: roll
 });
+
+/** Seconds to pull up onto a ledge: a chest-high mantle is quick, a dead hang is slow. */
+export const mantleSeconds = (rise) => .35 + .4 * Math.max(0, rise);
 
 // ---------------------------------------------------------------- hall roof profile
 // Mirrors eave_roof()/upper planes in creations/komorebi-shrine-kit create_shrine_kit.py.

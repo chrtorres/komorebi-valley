@@ -64,25 +64,54 @@ export function createCombatView(T, scene, player, { playerWeapon = true } = {})
     parent.add(o);
     return o;
   };
+  // Katana: curved (sori) steel blade with a ridge line, round iron tsuba and a
+  // black-wrapped tsuka. Grip at the origin, blade along +Y; length about .77 m.
+  const katana = (() => {
+    const shape = new T.Shape();
+    const base = 0.145, length = 0.74, sori = (t) => 0.026 * t * t;
+    const spine = [], edge = [];
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16, y = base + length * t;
+      spine.push([-0.004 - sori(t), y]);
+      edge.push([0.027 * (1 - 0.22 * t) - sori(t), y]);
+    }
+    shape.moveTo(...spine[0]);
+    for (const p of spine.slice(1)) shape.lineTo(...p);
+    // Kissaki: the edge sweeps up to meet the spine in a gentle curve.
+    const tipY = base + length + 0.055;
+    shape.quadraticCurveTo(-0.006 - sori(1), tipY, edge.at(-1)[0] - 0.006, base + length + 0.02);
+    for (const p of edge.slice().reverse()) shape.lineTo(...p);
+    shape.closePath();
+    const blade = ownGeometry(new T.ExtrudeGeometry(shape, {
+      depth: 0.0045, bevelEnabled: true, bevelThickness: 0.0016, bevelSize: 0.0014, bevelSegments: 1, curveSegments: 8,
+    }));
+    blade.translate(0, 0, -0.00225);
+    blade.computeVertexNormals();
+    return {
+      blade,
+      tsuka: ownGeometry(new T.CylinderGeometry(0.0165, 0.0175, 0.19, 12)),
+      tsuba: ownGeometry(new T.CylinderGeometry(0.041, 0.041, 0.008, 28)),
+      cap: ownGeometry(new T.SphereGeometry(0.019, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2)),
+      habaki: ownGeometry(new T.BoxGeometry(0.034, 0.025, 0.012)),
+      steel: ownMaterial(new T.MeshStandardMaterial({ color: 0xd7dcdf, metalness: 0.92, roughness: 0.22 })),
+      wrap: ownMaterial(new T.MeshStandardMaterial({ color: 0x1b1918, roughness: 0.9 })),
+      iron: ownMaterial(new T.MeshStandardMaterial({ color: 0x2c2b2a, metalness: 0.7, roughness: 0.45 })),
+      brass: ownMaterial(new T.MeshStandardMaterial({ color: 0x8a6a35, metalness: 0.85, roughness: 0.35 })),
+    };
+  })();
   function sword(parent, name) {
     const pivot = new T.Group();
     pivot.name = name;
     parent.add(pivot);
-    // Blade length .77 m; ridge and tapered tip retain a forged silhouette.
-    mesh(pivot, geo.box, mat.grip, [0, 0.035, 0], [0.038, 0.17, 0.043]);
-    mesh(pivot, geo.sphere, mat.gold, [0, -0.06, 0], [0.035, 0.035, 0.035]);
-    mesh(pivot, geo.box, mat.gold, [0, 0.13, 0], [0.21, 0.035, 0.065]);
-    mesh(pivot, geo.box, mat.steel, [0, 0.475, 0], [0.065, 0.64, 0.021]);
-    mesh(pivot, geo.box, mat.trim, [0, 0.475, -0.013], [0.012, 0.61, 0.006]);
-    mesh(pivot, geo.cone, mat.steel, [0, 0.845, 0], [0.038, 0.1, 0.014]);
-    for (let i = 0; i < 3; i++)
-      mesh(
-        pivot,
-        geo.box,
-        mat.gold,
-        [0, -0.015 + i * 0.045, -0.024],
-        [0.042, 0.009, 0.006],
-      );
+    mesh(pivot, katana.tsuka, katana.wrap, [0, 0.03, 0], [1, 1, 0.82]);
+    const cap = mesh(pivot, katana.cap, katana.iron, [0, -0.065, 0], [1, 1, 0.82]);
+    cap.rotation.x = Math.PI;
+    mesh(pivot, katana.tsuba, katana.iron, [0, 0.13, 0], [1, 1, 1]);
+    mesh(pivot, katana.habaki, katana.brass, [0.009, 0.147, 0], [1, 1, 1]);
+    mesh(pivot, katana.blade, katana.steel, [0, 0, 0], [1, 1, 1]);
+    // Diamond wrap: alternating light knots along the grip.
+    for (let i = 0; i < 5; i++)
+      mesh(pivot, geo.box, katana.iron, [0, -0.04 + i * 0.035, 0.0145], [0.02, 0.006, 0.004]);
     return pivot;
   }
   const held = new T.Group();

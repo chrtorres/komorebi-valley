@@ -58,11 +58,11 @@ try {
   record("Runtime model uses authored scale", Math.abs(start.scale - 1.8/1.652) < .00001);
   record("Idle foot meets the root's rest plane", Math.abs(start.footing - .07*start.scale) < .006);
   record("Combat weapon is parented to the grip", start.grip);
-  record("Exploration shows the helmet and cheek defense and loads textured human skin", await page.evaluate(() => {
+  record("Exploration shows the kasa, face wrap and head wrap and loads textured human skin", await page.evaluate(() => {
     const get = name => valley.player.getObjectByName(name);
     const face = get("WarriorFace");
-    return get("WarriorHelmet").visible && get("WarriorMask").visible &&
-      !get("WarriorStormHood").visible && face.material.map.image.width >= 1024 &&
+    return get("WarriorHelmet").visible && get("RoninKasa") && get("WarriorMask").visible &&
+      get("WarriorStormHood").visible && face.material.map.image.width >= 1024 &&
       face.material.normalMap.image.width >= 512 && get("WarriorEyes").material.map.image.width >= 512;
   }));
   const blink = await page.evaluate(() => new Promise(resolve => {
@@ -87,15 +87,19 @@ try {
     frameRequest = requestAnimationFrame(sample);
   }));
   record("The exact in-game face closes and reopens its eyelids", blink);
+  // A real leap needs a run-up: sprint about 2.5 s to near top speed, then jump.
   await page.keyboard.down("ShiftLeft");
   await page.keyboard.down("w");
+  await page.waitForTimeout(2500);
+  const takeoff = await snapshot();
   await page.keyboard.press("Space");
+  // 3.3 m/s takeoff: the feet clear 0.4 m about 0.17 s in and peak near 0.55 m.
   await page.waitForFunction(() => {
     const { player, world } = valley;
-    return player.position.y - world.height(player.position.x, player.position.z) > .8;
+    return player.position.y - world.height(player.position.x, player.position.z) > .4;
   });
   const airborne = await snapshot();
-  record("Keyboard sprint jump clears the ground", airborne.clearance > .65);
+  record("Keyboard sprint jump clears the ground", airborne.clearance > .4 && airborne.clearance < .62);
   record("Sprint leap folds the knee visibly", airborne.knee > start.knee + .30);
   await shot("game-leap");
   await page.waitForFunction(() => {
@@ -105,7 +109,8 @@ try {
   await page.keyboard.up("w");
   await page.keyboard.up("ShiftLeft");
   const landed = await snapshot();
-  record("Running leap displaces the player along the pass", start.p[2] - landed.p[2] > 4.8);
+  // Flight at about 7 m/s for 0.67 s: roughly 4-5 m from takeoff to touchdown.
+  record("Running leap displaces the player along the pass", takeoff.p[2] - landed.p[2] > 4);
   record("Player lands at the actual terrain height", landed.clearance < .03);
 
   await page.evaluate(() => {
@@ -161,7 +166,8 @@ try {
         position: player.position.toArray(),
         boots: soles.map(foot => foot.getWorldPosition(point).toArray()),
       });
-      if (elapsed < .65) requestAnimationFrame(sample);
+      // A friction-limited 90° cut, with leg force easing in, settles about 1 s after the stick turns.
+      if (elapsed < 1.3) requestAnimationFrame(sample);
       else {
         clearTimeout(watchdog);
         testPad.connected = false;
@@ -170,18 +176,54 @@ try {
     }
     requestAnimationFrame(sample);
   }));
-  const turnIndex = turn.findIndex(frame => Math.abs(frame.lag) > .6);
+  await writeFile(join(evidence, "ground-turn.json"), JSON.stringify(turn, null, 2));
+  // Free running curves the travel: the stick bends the path at once, facing follows the
+  // body's velocity (no side-slip), and the visible warrior never lags far behind it.
+  const turnIndex = turn.findIndex(frame => frame.elapsed >= .24);
   const firstTurn = turn[turnIndex];
-  const preceding = turn[turnIndex - 1];
+  const angle = a => Math.atan2(Math.sin(a), Math.cos(a));
+  const responded = turn.slice(turnIndex).find(frame => frame.elapsed <= firstTurn.elapsed + .1 &&
+    frame.position[0] - firstTurn.position[0] > .001);
+  // Gameplay facing never turns faster than a planted pivot (10 rad/s) in any frame.
+  const pivotOk = (trace) => trace.slice(1).every((frame, i) =>
+    Math.abs(angle(frame.heading - trace[i].heading)) <= 10 * (frame.elapsed - trace[i].elapsed) + .02);
+  const [a, b] = turn.slice(-2);
+  const travel = Math.atan2(b.position[0] - a.position[0], b.position[2] - a.position[2]);
   record("Xbox stick direction changes root travel immediately and eases the visible warrior through a turn",
-    firstTurn && preceding && Math.abs(firstTurn.lag) < Math.PI / 2 &&
-    firstTurn.position[0] - preceding.position[0] > .001 &&
-    Math.abs(turn.at(-1).lag) < .02 &&
-    turn.at(-1).position[0] - firstTurn.position[0] > .60);
+    firstTurn && responded && pivotOk(turn) &&
+    Math.max(...turn.map(frame => Math.abs(frame.lag))) < .6 && Math.abs(turn.at(-1).lag) < .02 &&
+    Math.abs(angle(b.heading - travel)) < .2 &&
+    turn.at(-1).position[0] - firstTurn.position[0] > .5);
   record("The authored boots continue articulating through the turn",
     new Set(turn.map(({ boots, position }) => (boots[0][1] - position[1]).toFixed(3))).size >= 5);
-  await writeFile(join(evidence, "ground-turn.json"), JSON.stringify(turn, null, 2));
   await shot("game-ground-turn");
+  // Reversal at run speed: brake, then pivot through 180° without snapping the facing.
+  const reversal = await page.evaluate(() => new Promise((resolve, reject) => {
+    const { player } = valley, trace = [];
+    const watchdog = setTimeout(() => { testPad.connected = false; reject(Error("Timed out sampling the reversal")); }, 45_000);
+    testPad.connected = true;
+    testPad.axes = [0, -1, 0, 0];
+    let elapsed = 0, last;
+    function sample(now) {
+      elapsed += last === undefined ? 0 : Math.min(.05, (now - last) / 1000);
+      last = now;
+      if (elapsed >= 1.2) testPad.axes = [0, 1, 0, 0];
+      trace.push({ elapsed, heading: player.rotation.y, position: player.position.toArray() });
+      if (elapsed < 2.8) requestAnimationFrame(sample);
+      else { clearTimeout(watchdog); testPad.axes = [0, 0, 0, 0]; testPad.connected = false; resolve(trace); }
+    }
+    requestAnimationFrame(sample);
+  }));
+  await writeFile(join(evidence, "ground-reversal.json"), JSON.stringify(reversal, null, 2));
+  const flip = reversal.findIndex(frame => frame.elapsed >= 1.2);
+  const [r0, r1] = reversal.slice(-2), back = reversal[flip];
+  const finalTravel = Math.atan2(r1.position[0] - r0.position[0], r1.position[2] - r0.position[2]);
+  record("A run-speed reversal brakes, pivots at a bounded rate and runs back the other way",
+    flip > 0 && pivotOk(reversal) &&
+    Math.abs(angle(finalTravel - reversal[flip - 1].heading)) > 2.8 &&
+    Math.abs(angle(r1.heading - finalTravel)) < .2 &&
+    // The stop is not instant: the body carries on past the flip point before coming back.
+    reversal.slice(flip).some(frame => Math.hypot(frame.position[0] - back.position[0], frame.position[2] - back.position[2]) > .3));
   await page.evaluate(() => {
     const enemy = valley.state.combat.enemies.find(enemy => enemy.health > 0);
     const z = enemy.z - 6;
@@ -247,20 +289,25 @@ try {
   await page.locator("#storm-enter").click();
   await page.waitForFunction(() => window.valley?.state.storm.active &&
     valley.player.getObjectByName("StormWeaponAttachment")?.parent?.name === "RightGrip");
-  record("Storm fits the woven hood to the head and exposes the face", await page.evaluate(() => {
+  record("Storm keeps the ronin's kasa, face wrap and head wrap; its own scarf gives way", await page.evaluate(() => {
     const get = name => valley.player.getObjectByName(name);
     return get("WarriorStormHood").parent.name === "WarriorHead" &&
-      get("WarriorStormHood").visible && !get("WarriorHelmet").visible &&
-      !get("WarriorMask").visible && !get("StormFallbackCostume").visible &&
-      get("WarriorFace").visible;
+      get("WarriorStormHood").visible && get("WarriorHelmet").visible &&
+      get("WarriorMask").visible && !get("StormFallbackCostume").visible &&
+      !get("StormScarfFabric").visible && valley.player.parent.getObjectByName("RoninScarfTails").visible;
   }));
+  // The crimson tails are world-space cloth: the first row must stay on the scarf anchor,
+  // seated on the neck wrap's outer surface (about 9 cm behind it, 4-5 cm to the side).
   const scarf = () => page.evaluate(() => {
-    const hood = valley.player.getObjectByName("WarriorStormHood");
-    const cloth = valley.player.getObjectByName("StormScarfFabric");
-    const vertices = cloth.geometry.attributes.position;
-    const hem = cloth.localToWorld(hood.position.clone().fromBufferAttribute(vertices, 2));
-    const anchor = hood.localToWorld(hood.position.clone().set(0, -.071, -.078));
-    return { vertices: Array.from(vertices.array), collarGap: hem.distanceTo(anchor) };
+    const tails = valley.player.parent.getObjectByName("RoninScarfTails");
+    const anchor = valley.player.getObjectByName("RoninScarfAnchor").getWorldPosition(valley.player.position.clone());
+    const vertices = tails.children.flatMap(mesh => Array.from(mesh.geometry.attributes.position.array));
+    const gaps = tails.children.map(mesh => {
+      const a = mesh.geometry.attributes.position;
+      const centre = valley.player.position.clone().fromBufferAttribute(a, 1);
+      return centre.distanceTo(anchor);
+    });
+    return { vertices, collarGap: Math.max(...gaps) };
   });
   const scarfRest = await scarf();
   record("Storm attaches its weapon to the warrior grip", await page.evaluate(() => {
@@ -279,7 +326,7 @@ try {
     scarfAir.vertices.every(Number.isFinite) &&
     scarfRest.vertices.some((value, index) => Math.abs(value - scarfAir.vertices[index]) > .01));
   record("The scarf stays attached to the collar through takeoff",
-    scarfRest.collarGap < .009 && scarfAir.collarGap < .009);
+    scarfRest.collarGap < .14 && scarfAir.collarGap < .14);
   await shot("game-storm-leap");
   record("No browser errors", errors.length === 0);
 } finally {
