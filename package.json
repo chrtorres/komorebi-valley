@@ -11,6 +11,7 @@
     "test:combat": "node scripts/combat-browser.mjs",
     "test:storm": "node scripts/storm-browser.mjs",
     "test:valley": "node scripts/valley-regression.mjs",
+    "test:mission": "node scripts/mission-browser.mjs",
     "gate:valley": "node scripts/valley-gate.mjs"
   },
   "files": ["dist"],

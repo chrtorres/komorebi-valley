@@ -100,6 +100,7 @@ export function createCombat(options = {}) {
   )
     throw new TypeError("Invalid enemy spawns");
   const externalEvents = [];
+  const awake = new Set();
   let defeated = new Set(),
     enemies,
     p,
@@ -139,6 +140,12 @@ export function createCombat(options = {}) {
       facing: 0,
     }));
     for (const e of enemies) if (defeated.has(e.id)) e.health = 0;
+    // Dormant spawns (mission encounters) wait inactive at zero health without being
+    // defeated; every combat system already skips actors with health <= 0.
+    for (const e of enemies) if (e.dormant && !defeated.has(e.id) && !awake.has(e.id)) {
+      e.health = 0;
+      e.phase = "dormant";
+    }
     attack = null;
     buffer = null;
     pending = {};
@@ -603,6 +610,23 @@ export function createCombat(options = {}) {
       reset();
       events = [];
       return snapshot({ dx: 0, dz: 0 });
+    },
+    /** Wake a dormant spawn at full health. Returns false if unknown, defeated or already awake. */
+    awaken(id) {
+      const e = enemies.find((enemy) => enemy.id === id);
+      if (!e || !e.dormant || defeated.has(id) || e.phase !== "dormant") return false;
+      awake.add(id);
+      Object.assign(e, { health: e.maxHealth, phase: "idle", timer: 0, vx: 0, vy: 0, vz: 0, y: ground(e.x, e.z) });
+      return true;
+    },
+    /** Return an awakened spawn to dormancy (mission restart). */
+    sleep(id) {
+      const e = enemies.find((enemy) => enemy.id === id);
+      if (!e || !e.dormant || defeated.has(id)) return false;
+      awake.delete(id);
+      Object.assign(e, { health: 0, phase: "dormant" });
+      if (targetId === id) targetId = null;
+      return true;
     },
   };
 }

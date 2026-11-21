@@ -594,7 +594,7 @@ export function createWorld(T, scene) {
   const currents = [];
   for (const w of [
     { x: 10, z: -20 },
-    { x: -8, z: -42 },
+    { x: -28, z: -50 }, // clear of the free-run course behind the shrine
   ]) {
     const points = [];
     for (let j = 0; j < 80; j++) {

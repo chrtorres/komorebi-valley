@@ -11,6 +11,9 @@ import { createStormRuntime } from "./storm-runtime.js";
 import { createValleyRender, GRAPHICS_TIERS } from "./valley-render.js";
 import { createPolish } from "./aaa-polish.js";
 import { landingRetention, pushOff, stepLocomotion } from "./locomotion-physics.js";
+import { createFreeRunCourse } from "./free-run-course.js";
+import { createMission } from "./mission.js";
+import { PARKOUR, findKick, findMantle, findWallRun, mantlePose, resolveBody, stillOnWall, surfaceHeight, topAt } from "./parkour.js";
 import { createInterface } from "./aaa-interface.js";
 import "./aaa.css";
 import { orbitLookAngle, orbitPitch, placeOrbitCamera } from "./camera-orbit.js";
@@ -222,8 +225,11 @@ function interact() {
     return;
   }
   if (!combatRuntime.alive || vault) return;
+  if (mission.interact(player, grounded)) return;
   if (nearWatchMarker()) {
-    notice("Watch marker · The tracks turn toward the cedar court. Someone followed them after the signals went dark.");
+    const begun = mission.offer();
+    notice("Watch marker · The tracks turn toward the cedar court. Someone followed them after the signals went dark." +
+      (begun ? " The ridge beacon has gone dark — follow the light west." : ""));
     return;
   }
   const i = lanterns.findIndex(
@@ -272,7 +278,7 @@ addEventListener("keydown", (e) => {
   if (storm.active) storm.keyDown(e.code);
   else combatRuntime.keyDown(e.code);
   if (e.code === "KeyE") interact();
-  if (e.code === "Space" && !storm.active && grounded && combatRuntime.alive)
+  if (e.code === "Space" && !storm.active && (grounded || wallRun) && combatRuntime.alive)
     jumpRequested = true;
   if (e.code === "KeyC") contemplate();
 });
@@ -305,6 +311,7 @@ canvas.addEventListener("lostpointercapture", endDrag);
 canvas.addEventListener("pointermove", (event) => {
   if (drag?.id !== event.pointerId) return;
   yaw -= (event.clientX - drag.x) * .005;
+  lastLook = elapsed;
   pitch = orbitPitch(pitch + (event.clientY - drag.y) * .006);
   drag.x = event.clientX;
   drag.y = event.clientY;
@@ -366,7 +373,7 @@ $("#quality").onclick = () => {
 resizePresentation();
 const windZones = [
     { x: 10, z: -20, radius: 8 },
-    { x: -8, z: -42, radius: 7 },
+    { x: -28, z: -50, radius: 7 }, // matches the second current in valley-world.js
   ],
   target = new T.Vector3();
 let resetWarriorMotion = false;
@@ -416,6 +423,16 @@ const storm = createStormRuntime(
 const stormCameraObstacles = [...world.cameraObstacles, ...storm.cameraObstacles];
 const polish = createPolish(T, { scene, camera, world, root });
 const hud = createInterface({ root });
+// Free-running course and the Ridge Signal mission (Veiled Pass only).
+const freeRun = createFreeRunCourse(T, scene, world);
+const mission = createMission({ T, root, camera, storage, course: freeRun, combat: combatRuntime, notice });
+mission.attachScene(scene);
+// Parkour state: an active wall-run or pull-up, and once-per-airtime moves.
+let wallRun = null, mantle = null, kickUsed = false, wallRunsThisAir = 0, wallLean = 0;
+// The orbit camera treats roofs and course tops as ground, so it never slips beneath a roof.
+const cameraFloor = (x, z) => Math.max(height(x, z), topAt(freeRun.course, x, z));
+// Manual look input pauses the camera's lazy follow behind the direction of travel.
+let lastLook = -Infinity;
 function frame(now) {
   requestAnimationFrame(frame);
   // Hit-stop briefly slows simulation time; the real frame delta still drives presentation.
@@ -443,6 +460,7 @@ function frame(now) {
     mx += deadzone(pad.axes[0]);
     mz += deadzone(pad.axes[1]);
     yaw -= deadzone(pad.axes[2]) * dt * 2;
+    if (deadzone(pad.axes[2]) || deadzone(pad.axes[3])) lastLook = elapsed;
     if (pad.buttons[0]?.pressed && !previous[0] && !storm.active)
       jumpRequested = true;
     if (!storm.active && pad.buttons[2]?.pressed && !previous[2]) interact();
@@ -476,6 +494,16 @@ function frame(now) {
     combatRuntime.core.hasPendingAction);
   const mayVault = !storm.active && grounded && duel.player.health > 0 &&
     duel.player.action === "idle" && !duel.player.guarding && !duel.targetId && !combatIntent;
+  if (jumpRequested && wallRun && !storm.active) {
+    // Wall-jump: keep the run's momentum and kick away from the face.
+    const along = Math.max(5, Math.hypot(bodyVelocity.x, bodyVelocity.z));
+    bodyVelocity.x = wallRun.tx * along * .8 + wallRun.nx * PARKOUR.jumpAway;
+    bodyVelocity.z = wallRun.tz * along * .8 + wallRun.nz * PARKOUR.jumpAway;
+    vy = PARKOUR.jumpUp;
+    wallRun = null;
+    kickUsed = false;
+    jumpRequested = false;
+  }
   if (jumpRequested && !storm.active && grounded && combatRuntime.alive) {
     if (mayVault) vault = findVault(player.position, dx, dz, vaultBarriers, height);
     const magnitude = Math.hypot(dx, dz);
@@ -535,6 +563,13 @@ function frame(now) {
       ((storm.active ? storm.state.combat?.player : combatState.player)?.action ?? "idle") !== "idle"),
     height: storm.active ? storm.height : height, x: player.position.x, z: player.position.z,
   });
+  if (wallRun && !vaultFrame) {
+    // Running the wall: momentum is redirected along the face.
+    const along = Math.max(6.2, Math.hypot(bodyVelocity.x, bodyVelocity.z));
+    bodyVelocity.x = wallRun.tx * along;
+    bodyVelocity.z = wallRun.tz * along;
+  }
+  if (mantle) bodyVelocity.x = bodyVelocity.z = 0;
   const nextX = T.MathUtils.clamp(
     player.position.x + (bodyVelocity.x + (leapDirection?.x ?? 0) * boost * movementScale) * dt + combatState.motion.dx,
     -70, 70,
@@ -560,6 +595,12 @@ function frame(now) {
       player.position.x = corrected.x;
       player.position.z = corrected.z;
     }
+    if (!vaultFrame && !mantle) {
+      // Scenery is solid: slide along walls, posts and lanterns instead of passing through.
+      const body = resolveBody(freeRun.course, player.position.x, player.position.z, player.position.y);
+      player.position.x = body.x;
+      player.position.z = body.z;
+    }
   }
   limbs.forEach(
     (l, i) =>
@@ -576,7 +617,10 @@ function frame(now) {
   const terrain = storm.active
     ? storm.height(player.position.x, player.position.z)
     : height(player.position.x, player.position.z);
-  const ground = vaultBarrierFloor(player.position, terrain, vaultBarriers),
+  const ground = Math.max(
+      vaultBarrierFloor(player.position, terrain, vaultBarriers),
+      storm.active ? -Infinity : surfaceHeight(freeRun.course, player.position.x, player.position.z, player.position.y),
+    ),
     gliding = (keys.has("Space") || pad?.buttons[0]?.pressed) && vy < 0,
     wind = windZones.some(
       (w) =>
@@ -584,7 +628,60 @@ function frame(now) {
     );
   let landed = false;
   const fallSpeed = vy;
-  if (vaultFrame) {
+  const hasInput = Math.hypot(dx, dz) > .3;
+  if (!storm.active && !vaultFrame && combatRuntime.alive) {
+    if (mantle) {
+      mantle.t += dt / PARKOUR.mantleTime;
+      const p = mantlePose(mantle.from, mantle.to, mantle.t);
+      player.position.set(p.x, p.y, p.z);
+      vy = 0;
+      if (mantle.t >= 1) {
+        player.position.y = mantle.to.y;
+        mantle = null;
+        grounded = true;
+      }
+    } else if (!grounded) {
+      const feet = player.position.y;
+      const ledge = hasInput && vy < 4.5 && !wallRun &&
+        findMantle(freeRun.course, player.position.x, player.position.z, dx, dz, feet);
+      if (ledge) {
+        mantle = { from: player.position.clone(), to: ledge, t: 0 };
+        wallRun = null;
+        leapDirection = null;
+        mission.record("mantles");
+      } else {
+        const kick = !kickUsed && hasInput && findKick(freeRun.course, player.position.x, player.position.z, dx, dz, feet);
+        if (kick) {
+          vy = Math.max(vy, PARKOUR.kickSpeed);
+          kickUsed = true;
+        }
+        const sprinting = speed === 7;
+        if (!wallRun && sprinting && hasInput && wallRunsThisAir < 2) {
+          const run = findWallRun(freeRun.course, player.position.x, player.position.z, bodyVelocity.x, bodyVelocity.z, feet);
+          if (run) {
+            wallRun = { ...run, t: 0 };
+            wallRunsThisAir += 1;
+            // A wall-run turns momentum into a shallow arc along the face.
+            vy = Math.min(Math.max(vy, 1.2), PARKOUR.runLift);
+            mission.record("wallRuns");
+          }
+        }
+        if (wallRun) {
+          wallRun.t += dt;
+          if (wallRun.t > PARKOUR.runTime || !hasInput ||
+              !stillOnWall(wallRun, player.position.x, player.position.z, feet)) wallRun = null;
+        }
+      }
+    }
+  }
+  if (grounded || storm.active) {
+    wallRun = null;
+    kickUsed = false;
+    wallRunsThisAir = 0;
+  }
+  if (mantle) {
+    // The pull-up owns the body this frame.
+  } else if (vaultFrame) {
     player.position.y = vaultFrame.y;
     grounded = landed = vaultFrame.progress === 1;
     if (landed) {
@@ -605,6 +702,8 @@ function frame(now) {
       )
         vy = combatState.motion.vertical;
       vy -= dt * 20 * (combatState.motion.gravity ?? 1);
+    } else if (wallRun) {
+      vy -= dt * PARKOUR.runGravity;
     } else {
       vy += dt * (catchingWind ? 5 : gliding ? -2 : -18);
       if (gliding) vy = Math.max(vy, -2.2);
@@ -628,7 +727,9 @@ function frame(now) {
   if (landed && leapDirection) leapRecovery = .34;
   if (landed && !vaultFrame) {
     // Touchdown: legs absorb part of the horizontal momentum and the camera dips with the impact.
-    const keep = landingRetention(fallSpeed);
+    // Holding a direction through a hard landing becomes a roll that keeps the run going.
+    const roll = !storm.active && hasInput && fallSpeed < -PARKOUR.rollFall;
+    const keep = roll ? .9 : landingRetention(fallSpeed);
     bodyVelocity.x *= keep;
     bodyVelocity.z *= keep;
     if (!reducedMotion) landingDip = Math.min(.45, Math.max(landingDip, -fallSpeed * .028));
@@ -650,12 +751,23 @@ function frame(now) {
     dt, distance: travel, heading,
     forward: travel > .0001 ? (traveledX * sinHeading + traveledZ * cosHeading) / travel : 1,
     sideways: travel > .0001 ? (traveledX * cosHeading - traveledZ * sinHeading) / travel : 0,
-    grounded, vertical: vy, leap: !!leapDirection || leapRecovery > 0, landed,
-    vault: vaultFrame?.progress, pose, reset: resetWarriorMotion,
+    grounded: grounded || !!wallRun, vertical: wallRun ? 0 : vy, leap: !!leapDirection || leapRecovery > 0, landed,
+    vault: vaultFrame?.progress ?? (mantle ? mantle.t : undefined), pose, reset: resetWarriorMotion,
     committedFacing: Boolean(vaultFrame || pose?.guarding ||
       (pose?.action && pose.action !== "idle") || combatState.targetId),
   });
   resetWarriorMotion = false;
+  // Lean into a wall-run: roll the visible body toward the face.
+  const visual = player.children[0];
+  if (visual) {
+    let lean = 0;
+    if (wallRun) {
+      const rightX = Math.cos(heading), rightZ = -Math.sin(heading);
+      lean = -Math.sign(rightX * -wallRun.nx + rightZ * -wallRun.nz) * .3;
+    }
+    wallLean += (lean - wallLean) * Math.min(1, dt * 10);
+    visual.rotation.z = reducedMotion ? 0 : wallLean;
+  }
   leapRecovery = Math.max(0, leapRecovery - dt);
   const near = lanterns.findIndex(
     (l, i) =>
@@ -667,8 +779,10 @@ function frame(now) {
   );
   $("#prompt").textContent = storm.active
     ? ""
+    : grounded && mission.nearBeacon(player)
+      ? `${pad ? "X" : "E"} · Light the signal beacon`
     : grounded && nearWatchMarker()
-      ? `${pad ? "X" : "E"} · Read the watch marker`
+      ? `${pad ? "X" : "E"} · Read the watch marker${mission.active ? "" : " · begin The Ridge Signal"}`
       : near >= 0
         ? `${pad ? "X" : "E"} · Restore this lantern`
         : vaultHint
@@ -692,8 +806,16 @@ function frame(now) {
     camera.fov += (fov - camera.fov) * Math.min(1, realDt * 5);
     camera.updateProjectionMatrix();
   }
+  // Lazy follow: while running mostly forward with no look input, ease the camera behind
+  // the travel direction. Strafing (beyond 75 degrees) never rotates it, so no spirals.
+  const travelSpeed = Math.hypot(bodyVelocity.x, bodyVelocity.z);
+  if (elapsed - lastLook > 1.1 && travelSpeed > 1.5 && !combatRuntime.state.targetId && !contemplating && !vault) {
+    const behind = Math.atan2(-bodyVelocity.x, -bodyVelocity.z);
+    const turn = Math.atan2(Math.sin(behind - yaw), Math.cos(behind - yaw));
+    if (Math.abs(turn) < 1.31) yaw += turn * Math.min(1, realDt * 1.4 * Math.min(1, travelSpeed / 5));
+  }
   const clearCamera = placeOrbitCamera(
-    target, yaw, pitch, orbitDistance, height,
+    target, yaw, pitch, orbitDistance, storm.active ? height : cameraFloor,
     storm.active ? stormCameraObstacles : world.cameraObstacles,
     ascentCamera * 2.55,
   );
@@ -715,14 +837,16 @@ function frame(now) {
   storm.render(dt, reducedMotion ? 0 : elapsed, !grounded);
   combatRuntime.render(dt, storm.active);
   const combatEvents = storm.active ? storm.state.combat?.events ?? [] : combatRuntime.state.events ?? [];
+  freeRun.update(realDt, reducedMotion ? 0 : elapsed);
+  if (!storm.active) mission.update(dt, elapsed, { player, grounded, events: combatEvents, combatState: combatRuntime.state });
   polish.update(realDt, elapsed, {
     player, stormActive: storm.active, events: combatEvents, reduced: reducedMotion,
-    cinematic: contemplating ? 1 : 0,
+    cinematic: contemplating || mission.cinematic ? 1 : 0,
   });
   hud.update(realDt, {
     stormActive: storm.active,
     engaged: !storm.active && combatRuntime.state.enemies?.some((e) => e.health > 0 &&
-      Math.hypot(e.x - player.position.x, e.z - player.position.z) < 16),
+      Math.hypot(e.x - player.position.x, e.z - player.position.z) < 9),
     contemplating,
   });
   presentation.render(storm.active, realDt);
@@ -770,6 +894,10 @@ window.valley = {
       graphics: presentation.resolution,
       combat: combatRuntime.state,
       storm: storm.state,
+      grounded,
+      vertical: vy,
+      mission: mission.state,
+      parkour: { wallRun: !!wallRun, mantle: !!mantle, kickUsed },
     };
   },
 };

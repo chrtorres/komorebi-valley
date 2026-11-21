@@ -198,3 +198,95 @@ aside strong { transition: color .6s ease, text-shadow .6s ease; }
 #prompt { transition: opacity .35s ease; }
 #prompt:empty { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { #notice.fresh { animation: none; } }
+
+/* Mission: objective tracker, waypoint marker and mission cards. */
+#mission-tracker {
+  position: fixed;
+  left: clamp(22px, 3.2vw, 96px);
+  top: clamp(150px, 19vh, 240px);
+  z-index: 3;
+  max-width: 330px;
+  padding: 14px 18px 14px 16px;
+  border-left: 2px solid #e8b56a;
+  background: linear-gradient(90deg, #0d1517cc, #0d151700);
+  color: #fff3dc;
+  opacity: 0;
+  transform: translateX(-12px);
+  transition: opacity .6s ease, transform .6s ease;
+  pointer-events: none;
+}
+#mission-tracker.active { opacity: 1; transform: none; }
+#mission-tracker.pulse h3 { animation: objective-in 1.2s cubic-bezier(.2, .7, .2, 1); }
+#mission-tracker small { font: 10px Arial, sans-serif; letter-spacing: .3em; color: #ffcf9a; }
+#mission-tracker h3 { font: 400 21px/1.25 Georgia, serif; margin: 8px 0 6px; }
+#mission-tracker p { font: 12px/1.55 Arial, sans-serif; color: #e9e1cf; margin: 0 0 8px; }
+#mission-tracker .mission-step { font: 10px Arial, sans-serif; letter-spacing: .18em; color: #cdbf9f; text-transform: uppercase; }
+@keyframes objective-in { from { opacity: 0; letter-spacing: .06em; filter: blur(2px); } to { opacity: 1; letter-spacing: 0; filter: none; } }
+
+#mission-marker {
+  position: fixed;
+  left: 0; top: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .4s ease;
+}
+#mission-marker.on { opacity: 1; }
+#mission-marker i {
+  position: absolute;
+  left: -9px; top: -9px;
+  width: 14px; height: 14px;
+  border: 2px solid #ffd59a;
+  transform: rotate(45deg);
+  box-shadow: 0 0 14px #ffb45a99;
+  animation: marker-breathe 1.8s ease-in-out infinite;
+}
+#mission-marker b {
+  position: absolute;
+  top: 12px; left: 50%;
+  transform: translateX(-50%);
+  font: 11px Arial, sans-serif;
+  letter-spacing: .12em;
+  color: #fff1d6;
+  text-shadow: 0 1px 6px #000c;
+  white-space: nowrap;
+}
+#mission-marker.edge i { border-color: #ffe7c2; }
+@keyframes marker-breathe { 50% { box-shadow: 0 0 22px #ffb45acc; } }
+
+#mission-card {
+  position: fixed;
+  left: 50%; top: 24vh;
+  z-index: 8;
+  transform: translate(-50%, 10px);
+  min-width: 360px;
+  text-align: center;
+  color: #fff5e4;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .9s ease, transform 1.2s cubic-bezier(.2, .7, .2, 1);
+}
+#mission-card.show { opacity: 1; transform: translate(-50%, 0); }
+#mission-card small { font: 11px Arial, sans-serif; letter-spacing: .5em; color: #ffcfa8; }
+#mission-card h2 { font: 400 clamp(32px, 3.6vw, 64px)/1.05 Georgia, serif; margin: 12px 0 10px; text-shadow: 0 4px 30px #000b; }
+#mission-card p { font: italic 15px/1.6 Georgia, serif; color: #efe4cf; margin: 0 auto; max-width: 520px; text-shadow: 0 2px 12px #000c; }
+#mission-card dl { display: grid; grid-template-columns: repeat(4, auto); justify-content: center; gap: 4px 28px; margin: 22px 0 0; }
+#mission-card dt { grid-row: 1; font: 10px Arial, sans-serif; letter-spacing: .25em; color: #d9c7a5; text-transform: uppercase; }
+#mission-card dd { grid-row: 2; margin: 0; font: 22px Georgia, serif; }
+body.photo-mode #mission-tracker, body.photo-mode #mission-marker, body.title-open #mission-tracker { opacity: 0 !important; }
+@media (max-width: 700px) {
+  #mission-tracker { top: auto; bottom: 210px; max-width: 70vw; }
+  #mission-card { min-width: 0; width: 90vw; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #mission-tracker, #mission-card { transition: opacity .2s linear; }
+  #mission-tracker.pulse h3, #mission-marker i { animation: none; }
+}
+/* Mission cards sit on a soft ink pool so they read over bright blossom or sky. */
+#mission-card::before {
+  content: "";
+  position: absolute;
+  inset: -70px -140px;
+  z-index: -1;
+  background: radial-gradient(ellipse at center, #070b0dd0 0%, #070b0d80 45%, #0000 72%);
+}

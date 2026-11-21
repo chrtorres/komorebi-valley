@@ -45,7 +45,7 @@ try {
   } else {
     console.log(`Ultra 4K production check ${graphics}`);
   }
-  for (const suite of ["sakura", "storm", "valley", "combat", "koi", "warrior", "vault"]) {
+  for (const suite of ["sakura", "storm", "valley", "combat", "koi", "warrior", "vault", "mission"]) {
     const script = suite === "valley" ? "valley-regression" : `${suite}-browser`;
     await run(process.execPath, [`scripts/${script}.mjs`], {
       BASE_URL: baseURL,

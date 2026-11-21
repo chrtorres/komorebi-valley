@@ -18,6 +18,8 @@ export function createCombatRuntime(
     { id: "warden-cedar", x: -16, z: -29, health: 85 },
     { id: "warden-stream", x: -22, z: -31, health: 85 },
     { id: "warden-ridge", x: 17, z: -54, health: 105 },
+    // Mission encounter: the Hollow General wakes when the ridge signal is lit.
+    { id: "hollow-general", x: -1, z: -48, health: 170, dormant: true }, // open field south of the cloister
   ];
   const core = createCombat({ height, enemies, aggroRange: 8 });
   try {
