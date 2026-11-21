@@ -1,0 +1,137 @@
+#app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, #101b1d60, transparent 23%),
+    linear-gradient(0deg, #0d171ba6, transparent 27%);
+}
+
+header {
+  pointer-events: none;
+  top: clamp(23px, 3.8vh, 64px);
+  left: clamp(22px, 3.2vw, 96px);
+}
+header small {
+  font-size: 10px;
+  letter-spacing: .28em;
+  color: #ffedc7;
+}
+header h1 {
+  font-size: clamp(33px, 3.1vw, 82px);
+  letter-spacing: -.042em;
+  line-height: 1;
+  margin: 12px 0 6px;
+}
+header p {
+  font-style: italic;
+  margin: 0;
+  color: #f0e8d5;
+  font-size: clamp(12px, 1vw, 19px);
+}
+
+aside {
+  top: clamp(23px, 3.8vh, 64px);
+  right: clamp(22px, 3.2vw, 96px);
+  width: clamp(218px, 18vw, 340px);
+  background: linear-gradient(145deg, #1b2929e6, #1f3030b8);
+  border: 1px solid #dfd3b841;
+  border-radius: 10px;
+  box-shadow: 0 16px 42px #16222138;
+  backdrop-filter: blur(14px);
+  padding: clamp(16px, 1.6vw, 27px);
+}
+aside small {
+  color: #e8d8b7;
+  font-size: 9px;
+  letter-spacing: .19em;
+}
+aside h2 {
+  margin: 14px 0 0;
+  font-size: clamp(20px, 1.5vw, 28px);
+  line-height: 1.2;
+}
+aside p {
+  color: #e9e4d6;
+  line-height: 1.62;
+}
+aside strong {
+  display: block;
+  margin-top: .7em;
+  color: #ffe4ac;
+}
+
+footer {
+  bottom: clamp(19px, 3vh, 48px);
+  left: clamp(22px, 3.2vw, 96px);
+  font-size: 11px;
+  letter-spacing: .035em;
+}
+footer p {
+  font-size: 11px;
+  line-height: 1.75;
+  color: #e6e5d7;
+  margin: 9px 0 13px;
+}
+button {
+  background: #172628ce;
+  border: 1px solid #e3d4b66e;
+  border-radius: 5px;
+  color: #fff2d9;
+  margin-right: 7px;
+  font: 11px Arial, sans-serif;
+  letter-spacing: .025em;
+}
+button:hover,
+button:focus-visible {
+  background: #415350eb;
+  outline: 1px solid #ffedc7;
+}
+canvas {
+  touch-action: none;
+}
+#prompt {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  font: 12px Arial, sans-serif;
+  letter-spacing: .08em;
+  background: #132222df;
+  border: 1px solid #e3d4b667;
+  border-radius: 6px;
+  padding: 10px 16px;
+  text-align: center;
+}
+#prompt:empty {
+  display: none;
+}
+@media (max-width: 800px) {
+  header h1 {
+    font-size: 30px;
+  }
+  aside {
+    width: min(200px, 42vw);
+  }
+  #saved {
+    display: block;
+    margin: 8px 0;
+  }
+  button {
+    padding: 9px;
+  }
+  #prompt {
+    bottom: 185px;
+    max-width: calc(100vw - 2rem);
+    width: max-content;
+  }
+}
+@media (max-width: 700px) {
+  aside {
+    top: auto;
+    bottom: 172px;
+  }
+}

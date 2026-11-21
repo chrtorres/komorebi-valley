@@ -1,0 +1,99 @@
+#storm-hud {
+  position: fixed;
+  z-index: 8;
+  right: 1rem;
+  bottom: 1rem;
+  width: min(30rem, calc(100vw - 2rem));
+  text-align: right;
+}
+#storm-status,
+#storm-menu {
+  background: #0a1929ed;
+  color: #f3eeef;
+  border: 1px solid #67d9ea7a;
+  border-radius: 0.45rem;
+  padding: 1rem;
+  box-shadow: 0 0.2rem 1.6rem #020818a0;
+}
+#storm-status strong,
+#storm-resources {
+  display: block;
+}
+#storm-resources {
+  color: #a0f0ff;
+  margin-top: 0.4rem;
+}
+#storm-status p {
+  margin: 0.5rem 0 0;
+}
+#storm-status .storm-controls {
+  font-size: 0.72rem;
+  color: #c0dde8;
+}
+#storm-menu {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(35rem, calc(100vw - 2rem));
+  max-height: 88vh;
+  overflow: auto;
+  text-align: left;
+}
+#storm-menu h2 {
+  margin-top: 0;
+}
+#storm-menu button {
+  margin: 0.18rem;
+}
+#storm-menu button:focus-visible {
+  outline: 2px solid #a2fbff;
+}
+.storm-armory > div {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.35rem 0;
+}
+.storm-armory button[aria-pressed="true"] {
+  color: #88f2ff;
+}
+#storm-hud [hidden] {
+  display: none;
+}
+.storm-active > aside {
+  display: none;
+}
+.storm-active > header h1 {
+  color: #fff5eb;
+}
+.storm-active #storm-hud {
+  bottom: auto;
+  top: 1rem;
+  width: min(24rem, calc(100vw - 2rem));
+}
+.storm-active #storm-status {
+  font-family: Arial, sans-serif;
+}
+@media (max-width: 650px) {
+  .storm-active #storm-hud {
+    top: auto;
+    bottom: 7rem;
+  }
+}
+@media (max-width: 650px) {
+  #storm-status {
+    padding: 0.55rem;
+    font-size: 0.76rem;
+  }
+  #storm-menu {
+    font-size: 0.83rem;
+  }
+  .storm-armory > div {
+    grid-template-columns: 1fr auto;
+  }
+  .storm-armory span {
+    grid-column: 1/-1;
+  }
+}

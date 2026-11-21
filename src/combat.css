@@ -1,0 +1,83 @@
+#combat-hud {
+  position: fixed;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 330px;
+  z-index: 3;
+  padding: 15px 20px;
+  background: #18312c99;
+  border: 1px solid #f2dfad33;
+  backdrop-filter: blur(10px);
+  font: 10px Arial;
+  color: #eee3c9;
+  opacity: 0.65;
+}
+#combat-hud.engaged {
+  opacity: 1;
+}
+#combat-hud small {
+  font-size: 8px;
+  letter-spacing: 2px;
+}
+.combat-bars {
+  display: flex;
+  gap: 14px;
+  margin: 12px 0;
+}
+.combat-bars label {
+  width: 50%;
+  font-size: 9px;
+}
+#combat-hud progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  margin-top: 6px;
+  accent-color: #c8b280;
+}
+#combat-hud #vitality {
+  accent-color: #a96650;
+}
+#combo {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #ffe0a1;
+  min-height: 14px;
+}
+#combat-phase {
+  margin: 5px 0;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+#combat-hud details {
+  margin-top: 10px;
+}
+#combat-hud summary {
+  cursor: pointer;
+  color: #cbd5bd;
+  font-size: 9px;
+}
+#combat-hud details p {
+  font: 10px/1.7 Arial;
+}
+#combat-hud button {
+  margin-top: 12px;
+}
+#combat-hud:has(details[open]) {
+  opacity: 1;
+}
+@media (max-width: 900px) {
+  #combat-hud {
+    top: auto;
+    bottom: 190px;
+    left: 18px;
+    transform: none;
+    width: 260px;
+  }
+  #combat-hud details[open] {
+    max-height: 180px;
+    overflow: auto;
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "komorebi-valley",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "start": "vite preview --host 127.0.0.1",
+    "smoke": "node scripts/valley-regression.mjs",
+    "test:journey": "node --test scripts/journey.test.mjs",
+    "test:unit": "node --test scripts/*.test.mjs",
+    "test:combat": "node scripts/combat-browser.mjs",
+    "test:storm": "node scripts/storm-browser.mjs",
+    "test:valley": "node scripts/valley-regression.mjs",
+    "gate:valley": "node scripts/valley-gate.mjs"
+  },
+  "files": ["dist"],
+  "type": "module",
+  "dependencies": {
+    "@fontsource-variable/dm-sans": "5.2.8",
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "playwright": "1.65.1",
+    "vite": "6.4.6"
+  },
+  "private": true
+}

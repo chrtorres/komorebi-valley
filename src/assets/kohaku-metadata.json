@@ -1,0 +1,13 @@
+{
+  "source": "Kōhaku koi field study, version 008, Pond view",
+  "sourceAsset": "review/pond/model.glb",
+  "sourceSha256": "8d61efeb8427a7bb2bc5a05d06c2f0ecd19bee1cc2a2e9f57921861d046f1e49",
+  "runtimeSha256": "52b2e4ebe2dafe40dc5bfd7bbdf829aab27bb634fbce74edf4b6edf116defabe",
+  "tool": "@gltf-transform/cli@4.4.0",
+  "steps": [
+    "simplify --ratio 0.12 --error 0.002",
+    "resize --width 1024 --height 1024",
+    "webp",
+    "meshopt --level medium"
+  ]
+}

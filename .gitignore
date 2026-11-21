@@ -1,0 +1,17 @@
+node_modules/
+dist/
+playwright-report/
+test-results/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+
+/review/
+.env
+.env.*
+*.jsonl
+*.key
+*.pem
+*.p12
+*.pfx
